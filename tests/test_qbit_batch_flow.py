@@ -151,25 +151,28 @@ def _load_batch_module(monkeypatch, tmp_path, tor_info, files):
     monkeypatch.setitem(sys.modules, "bot.helper.ext_utils.file_types", file_types)
 
     stub("bot.helper.ext_utils.bot_utils", sync_to_async=async_sync_to_async)
+
+    class DummyFFMpeg:
+        def __init__(self, listener):
+            self.listener = listener
+
+        async def split(self, f_path, file_, parts, split_size):
+            return True
+
+    async def unknown_document_type(path):
+        return False, False, False
+
+    stub(
+        "bot.helper.ext_utils.media_utils",
+        FFMpeg=DummyFFMpeg,
+        get_document_type=unknown_document_type,
+    )
     stub(
         "bot.helper.ext_utils.files_utils",
         clean_download=noop,
         split_file=noop,
     )
     stub("bot.helper.ext_utils.links_utils", is_gdrive_id=lambda value: False)
-
-    class DummyFFMpeg:
-        def __init__(self, listener):
-            self.listener = listener
-
-        async def split(self, *args, **kwargs):
-            return True
-
-    stub(
-        "bot.helper.ext_utils.media_utils",
-        FFMpeg=DummyFFMpeg,
-        get_document_type=noop,
-    )
     stub(
         "bot.helper.ext_utils.status_utils",
         get_readable_file_size=lambda size: f"{size} B",
@@ -340,6 +343,71 @@ async def test_batch_skips_unwanted_file_types(monkeypatch, tmp_path):
     assert [file_info["name"] for file_info in batch.pending] == [
         "TorrentName/a.mkv"
     ]
+
+
+@pytest.mark.asyncio
+async def test_wait_batch_ignores_preallocated_placeholder(monkeypatch, tmp_path):
+    root = tmp_path / "123" / "TorrentName"
+    root.mkdir(parents=True)
+    (root / "a.mkv").write_bytes(b"\0" * 16)
+    tor_info = SimpleNamespace(
+        hash="abc123def456", content_path=str(root), state="downloading"
+    )
+    files = [FakeTorrentFile(0, "TorrentName/a.mkv", 4096)]
+    files[0].progress = 0.5
+    module = _load_batch_module(monkeypatch, tmp_path, tor_info, files)
+    listener, task_dir, uploads, errors, completed = _listener(tmp_path)
+    batch = module.QbitBatch(listener, tor_info, files)
+    polls = []
+
+    async def fake_sleep(seconds):
+        polls.append(seconds)
+        files[0].progress = 1.0
+
+    monkeypatch.setattr(module, "sleep", fake_sleep)
+    assert await batch._wait_batch(batch.pending) is True
+    assert polls, "an existing file must not count as a completed download"
+
+
+@pytest.mark.asyncio
+async def test_batch_splits_videos_with_ffmpeg(monkeypatch, tmp_path):
+    root = tmp_path / "123" / "TorrentName"
+    root.mkdir(parents=True)
+    video = root / "a.mkv"
+    video.write_bytes(b"x" * 25)
+    tor_info = SimpleNamespace(
+        hash="abc123def456", content_path=str(root), state="uploading"
+    )
+    files = [FakeTorrentFile(0, "TorrentName/a.mkv", 25)]
+    module = _load_batch_module(monkeypatch, tmp_path, tor_info, files)
+    listener, task_dir, uploads, errors, completed = _listener(tmp_path)
+    listener.split_size = 10
+    listener.equal_splits = False
+    listener.as_doc = False
+    listener.max_split_size = 10
+    batch = module.QbitBatch(listener, tor_info, files)
+    job = module.BatchFileJob(listener, batch.files[0], str(video))
+    calls = []
+
+    class FakeFFMpeg:
+        def __init__(self, listener):
+            self.listener = listener
+
+        async def split(self, path, name, parts, split_size):
+            calls.append((name, parts, split_size))
+            return True
+
+    async def is_video(path):
+        return True, False, False
+
+    async def raw_split(*args, **kwargs):
+        raise AssertionError("videos must be cut with ffmpeg, not raw split")
+
+    monkeypatch.setattr(module, "FFMpeg", FakeFFMpeg)
+    monkeypatch.setattr(module, "get_document_type", is_video)
+    monkeypatch.setattr(module, "split_file", raw_split)
+    await batch._upload_one(job)
+    assert calls == [("a.mkv", 3, 10)]
 
 
 @pytest.mark.asyncio

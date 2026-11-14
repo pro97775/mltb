@@ -71,7 +71,6 @@ class BatchFileJob:
         self.path = file_path
         self.rel_dir = rel_dir
         self.name = ospath.basename(file_info["name"])
-        self.display_name = self.name
         self.size = file_info["size"]
         self.is_file = True
         self.dir = listener.dir
@@ -304,25 +303,16 @@ class QbitBatch:
                 await sleep(3)
                 continue
             progress = {file_info.index: file_info.progress for file_info in files}
-            completed = True
-            for file_info in batch:
-                if not file_info["size"]:
-                    continue
-                if progress.get(file_info["index"], 0) < 0.999:
-                    if not await self._on_disk(file_info):
-                        completed = False
-                        break
-            if completed:
-                return True
-            await sleep(3)
-
-    async def _on_disk(self, file_info):
-        for path in self._candidate_paths(file_info):
-            if await aiopath.exists(path) and not await aiopath.exists(
-                f"{path}.!qB"
+            # qBittorrent pre-allocates every selected file and this image turns
+            # off the ".!qB" marker, so a file exists long before it is complete.
+            # Only the per-file progress proves the data is on disk.
+            if all(
+                not file_info["size"]
+                or progress.get(file_info["index"], 0) >= 0.999
+                for file_info in batch
             ):
                 return True
-        return False
+            await sleep(3)
 
     def _candidate_paths(self, file_info):
         name = file_info["name"]
@@ -409,26 +399,7 @@ class QbitBatch:
                             f"free {get_readable_file_size(free)}. Use rclone instead."
                         )
                         return job.error
-                    parts = -(-job.size // self.listener.split_size)
-                    is_video = (
-                        not self.listener.as_doc
-                        and (await get_document_type(staged_path))[0]
-                    )
-                    LOGGER.info(
-                        f"Splitting {job.name} into {parts} part(s) for Telegram"
-                    )
-                    if is_video:
-                        split_ok = await FFMpeg(self.listener).split(
-                            staged_path,
-                            job.name,
-                            parts,
-                            self.listener.split_size,
-                        )
-                    else:
-                        split_ok = await split_file(
-                            staged_path, self.listener.split_size, self.listener
-                        )
-                    if not split_ok:
+                    if not await self._split_for_telegram(job, staged_path):
                         job.error = f"Could not split {job.name} for Telegram."
                         return job.error
                     if moved:
@@ -471,6 +442,17 @@ class QbitBatch:
             async with task_dict_lock:
                 task_dict[self.listener.mid] = RcloneStatus(job, uploader, gid, "up")
             await gather(update_status_message(chat_id), uploader.upload(job.path))
+
+    async def _split_for_telegram(self, job, file_path):
+        split_size = self.listener.split_size
+        parts = -(-job.size // split_size)
+        if self.listener.equal_splits:
+            split_size = (job.size // parts) + (job.size % parts)
+        if not self.listener.as_doc and (await get_document_type(file_path))[0]:
+            return await FFMpeg(self.listener).split(
+                file_path, job.name, parts, split_size
+            )
+        return await split_file(file_path, split_size, self.listener)
 
     def _rclone_file_destination(self, rel_dir):
         if not rel_dir or rel_dir == ".":
