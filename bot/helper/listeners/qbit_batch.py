@@ -8,7 +8,7 @@ task, then deleted locally before the next files are marked for download.
 
 from asyncio import gather, sleep
 from html import escape
-from os import path as ospath
+from os import path as ospath, symlink
 from time import time
 
 from aiofiles.os import makedirs, remove, rename, rmdir
@@ -393,7 +393,7 @@ class QbitBatch:
             moved = False
             try:
                 try:
-                    await sync_to_async(ospath.symlink, job.path, staged_path)
+                    await sync_to_async(symlink, job.path, staged_path)
                 except OSError:
                     await rename(job.path, staged_path)
                     job.path = staged_path

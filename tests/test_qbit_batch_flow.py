@@ -355,3 +355,14 @@ async def test_batch_handles_file_name_without_torrent_folder(
     assert uploads == ["a.mkv"]
     assert not (root / "a.mkv").exists()
     assert errors == []
+
+
+def test_batch_uses_os_symlink(monkeypatch, tmp_path):
+    tor_info = SimpleNamespace(
+        hash="abc123def456",
+        content_path=str(tmp_path / "123" / "TorrentName"),
+        state="uploading",
+    )
+    module = _load_batch_module(monkeypatch, tmp_path, tor_info, [])
+    # os.path has no symlink(); using it aborted every Telegram batch.
+    assert module.symlink is os.symlink
