@@ -36,6 +36,7 @@ from ..ext_utils.file_types import (
 )
 from ..ext_utils.files_utils import clean_download, split_file
 from ..ext_utils.links_utils import is_gdrive_id
+from ..ext_utils.media_utils import FFMpeg, get_document_type
 from ..ext_utils.status_utils import get_readable_file_size
 from ..ext_utils.task_manager import start_from_queued
 from ..mirror_leech_utils.gdrive_utils.upload import GoogleDriveUpload
@@ -70,6 +71,7 @@ class BatchFileJob:
         self.path = file_path
         self.rel_dir = rel_dir
         self.name = ospath.basename(file_info["name"])
+        self.display_name = self.name
         self.size = file_info["size"]
         self.is_file = True
         self.dir = listener.dir
@@ -407,9 +409,26 @@ class QbitBatch:
                             f"free {get_readable_file_size(free)}. Use rclone instead."
                         )
                         return job.error
-                    if not await split_file(
-                        staged_path, self.listener.split_size, self.listener
-                    ):
+                    parts = -(-job.size // self.listener.split_size)
+                    is_video = (
+                        not self.listener.as_doc
+                        and (await get_document_type(staged_path))[0]
+                    )
+                    LOGGER.info(
+                        f"Splitting {job.name} into {parts} part(s) for Telegram"
+                    )
+                    if is_video:
+                        split_ok = await FFMpeg(self.listener).split(
+                            staged_path,
+                            job.name,
+                            parts,
+                            self.listener.split_size,
+                        )
+                    else:
+                        split_ok = await split_file(
+                            staged_path, self.listener.split_size, self.listener
+                        )
+                    if not split_ok:
                         job.error = f"Could not split {job.name} for Telegram."
                         return job.error
                     if moved:

@@ -157,6 +157,19 @@ def _load_batch_module(monkeypatch, tmp_path, tor_info, files):
         split_file=noop,
     )
     stub("bot.helper.ext_utils.links_utils", is_gdrive_id=lambda value: False)
+
+    class DummyFFMpeg:
+        def __init__(self, listener):
+            self.listener = listener
+
+        async def split(self, *args, **kwargs):
+            return True
+
+    stub(
+        "bot.helper.ext_utils.media_utils",
+        FFMpeg=DummyFFMpeg,
+        get_document_type=noop,
+    )
     stub(
         "bot.helper.ext_utils.status_utils",
         get_readable_file_size=lambda size: f"{size} B",
