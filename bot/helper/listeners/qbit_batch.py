@@ -133,6 +133,7 @@ class QbitBatch:
         # qBittorrent file names already include the torrent's root folder, so
         # they are relative to the task save path, not to content_path.
         self.root = self.task_root
+        self.content_path = (tor_info.content_path or "").rstrip("/")
         if not (
             listener.is_leech
             or listener.is_buzzheavier
@@ -159,6 +160,10 @@ class QbitBatch:
 
     async def run(self):
         try:
+            LOGGER.info(
+                f"Qbit batch start: save_path={self.task_root} "
+                f"content_path={self.content_path}"
+            )
             if not self.pending:
                 raise BatchError(
                     "No downloadable files in this torrent. Check the selected "
@@ -310,8 +315,35 @@ class QbitBatch:
             await sleep(3)
 
     async def _on_disk(self, file_info):
-        path = ospath.join(self.root, file_info["name"])
-        return await aiopath.exists(path) and not await aiopath.exists(f"{path}.!qB")
+        for path in self._candidate_paths(file_info):
+            if await aiopath.exists(path) and not await aiopath.exists(
+                f"{path}.!qB"
+            ):
+                return True
+        return False
+
+    def _candidate_paths(self, file_info):
+        name = file_info["name"]
+        candidates = [ospath.join(self.task_root, name)]
+        if self.content_path:
+            root_name = ospath.basename(self.content_path)
+            candidates.append(ospath.join(self.content_path, name))
+            if name.startswith(f"{root_name}/"):
+                candidates.append(
+                    ospath.join(self.content_path, name[len(root_name) + 1 :])
+                )
+            candidates.append(ospath.join(ospath.dirname(self.content_path), name))
+        unique = []
+        for path in candidates:
+            if path not in unique:
+                unique.append(path)
+        return unique
+
+    async def _resolve_file_path(self, file_info):
+        for path in self._candidate_paths(file_info):
+            if await aiopath.exists(path):
+                return path
+        return None
 
     async def _upload_batch(self, batch):
         try:
@@ -326,9 +358,12 @@ class QbitBatch:
         for position, file_info in enumerate(batch, start=1):
             if self.listener.is_cancelled or intervals["stopAll"]:
                 return
-            path = ospath.join(self.root, file_info["name"])
-            if not await aiopath.exists(path):
-                self.error = f"Downloaded file is missing: {path}"
+            path = await self._resolve_file_path(file_info)
+            if path is None:
+                candidates = ", ".join(self._candidate_paths(file_info))
+                self.error = (
+                    "Downloaded file is missing. Tried: " + candidates
+                )
                 return
             rel_dir = ospath.dirname(file_info["name"])
             job = BatchFileJob(self.listener, file_info, path, rel_dir)

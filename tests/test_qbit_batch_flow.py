@@ -327,3 +327,31 @@ async def test_batch_skips_unwanted_file_types(monkeypatch, tmp_path):
     assert [file_info["name"] for file_info in batch.pending] == [
         "TorrentName/a.mkv"
     ]
+
+
+@pytest.mark.asyncio
+async def test_batch_handles_file_name_without_torrent_folder(
+    monkeypatch, tmp_path
+):
+    root = tmp_path / "123" / "TorrentName"
+    root.mkdir(parents=True)
+    (root / "a.mkv").write_bytes(b"a")
+    tor_info = SimpleNamespace(
+        hash="abc123def456", content_path=str(root), state="uploading"
+    )
+    # Some qBittorrent versions return only the relative file name here.
+    files = [FakeTorrentFile(0, "a.mkv", 1)]
+    module = _load_batch_module(monkeypatch, tmp_path, tor_info, files)
+    listener, task_dir, uploads, errors, completed = _listener(tmp_path)
+    batch = module.QbitBatch(listener, tor_info, files)
+
+    async def fake_upload(job):
+        uploads.append(job.name)
+        job.result = ((None, {f"link-{job.name}": job.name}, 1, 0), {})
+
+    batch._upload_one = fake_upload
+    await batch.run()
+
+    assert uploads == ["a.mkv"]
+    assert not (root / "a.mkv").exists()
+    assert errors == []
