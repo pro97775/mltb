@@ -161,13 +161,3 @@ def plan_batch(files, max_files: int = 0, max_size: int = 0) -> list:
         batch.append(file_info)
         total_size += size
     return batch
-
-
-def content_root(content_path: str, file_names) -> str:
-    """Return the directory that torrent file names are relative to."""
-    content_path = (content_path or "").rstrip("/")
-    if not content_path:
-        return ""
-    if len(file_names) == 1 and ospath.basename(content_path) == file_names[0]:
-        return ospath.dirname(content_path)
-    return content_path

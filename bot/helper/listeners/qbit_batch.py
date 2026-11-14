@@ -30,7 +30,6 @@ from ... import (
 from ...core.torrent_manager import TorrentManager
 from ..ext_utils.bot_utils import sync_to_async
 from ..ext_utils.file_types import (
-    content_root,
     is_extension_allowed,
     is_file_type_allowed,
     plan_batch,
@@ -131,10 +130,9 @@ class QbitBatch:
         self.seq = 0
         self.batch_offset = 0
         self.error = ""
-        self.root = (
-            content_root(tor_info.content_path, [file_info.name for file_info in files])
-            or self.task_root
-        )
+        # qBittorrent file names already include the torrent's root folder, so
+        # they are relative to the task save path, not to content_path.
+        self.root = self.task_root
         if not (
             listener.is_leech
             or listener.is_buzzheavier

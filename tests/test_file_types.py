@@ -86,22 +86,3 @@ def test_plan_batch_keeps_oversized_first_file(file_types):
 
 def test_plan_batch_empty(file_types):
     assert file_types.plan_batch([], max_files=2) == []
-
-
-def test_content_root_single_file_torrent(file_types):
-    assert (
-        file_types.content_root("/downloads/123/movie.mkv", ["movie.mkv"])
-        == "/downloads/123"
-    )
-
-
-def test_content_root_folder_torrent(file_types):
-    assert (
-        file_types.content_root("/downloads/123/TorrentName", ["TorrentName/a.mkv"])
-        == "/downloads/123/TorrentName"
-    )
-    # A folder torrent that contains a single file must keep its folder root.
-    assert (
-        file_types.content_root("/downloads/123/TorrentName", ["movie.mkv"])
-        == "/downloads/123/TorrentName"
-    )

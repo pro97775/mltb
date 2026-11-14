@@ -284,8 +284,8 @@ async def test_batch_downloads_uploads_and_deletes_in_order(monkeypatch, tmp_pat
         hash="abc123def456", content_path=str(root), state="uploading"
     )
     files = [
-        FakeTorrentFile(0, "a.mkv", 1),
-        FakeTorrentFile(1, "b.jpg", 1),
+        FakeTorrentFile(0, "TorrentName/a.mkv", 1),
+        FakeTorrentFile(1, "TorrentName/b.jpg", 1),
     ]
     module = _load_batch_module(monkeypatch, tmp_path, tor_info, files)
     listener, task_dir, uploads, errors, completed = _listener(tmp_path)
@@ -317,11 +317,13 @@ async def test_batch_skips_unwanted_file_types(monkeypatch, tmp_path):
         hash="abc123def456", content_path=str(root), state="uploading"
     )
     files = [
-        FakeTorrentFile(0, "a.mkv", 1),
-        FakeTorrentFile(1, "b.jpg", 1),
+        FakeTorrentFile(0, "TorrentName/a.mkv", 1),
+        FakeTorrentFile(1, "TorrentName/b.jpg", 1),
     ]
     module = _load_batch_module(monkeypatch, tmp_path, tor_info, files)
     listener, task_dir, uploads, errors, completed = _listener(tmp_path)
     listener.file_types = ["video"]
     batch = module.QbitBatch(listener, tor_info, files)
-    assert [file_info["name"] for file_info in batch.pending] == ["a.mkv"]
+    assert [file_info["name"] for file_info in batch.pending] == [
+        "TorrentName/a.mkv"
+    ]
