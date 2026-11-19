@@ -149,6 +149,14 @@ def direct_link_generator(link):
         return hubdrive(link)
     elif "hubcloud" in domain:
         return hubcloud(link)
+    elif "linkshub" in domain:
+        return linkshub(link)
+    elif "hubcdn" in domain:
+        return hubcdn(link)
+    elif "drivehub" in domain:
+        return drivehub(link)
+    elif any(x in domain for x in ["vikingfile.com", "vik1ngfile.site"]):
+        return vikingfile(link)
     elif "devuploads" in domain:
         return devuploads(link)
     elif "lulacloud.com" in domain:
@@ -411,6 +419,24 @@ def transfer_it(url):
 def _hubcloud_links(session, url):
     try:
         tree = HTML(session.get(url).text)
+        if gen := tree.xpath(
+            "//a[contains(@href, 'gamerxyt.com/hubcloud.php')]/@href"
+        ):
+            page = HTML(session.get(gen[0], headers={"Referer": url}).text)
+            generated = [
+                h
+                for h in page.xpath("//a/@href")
+                if any(
+                    key in h
+                    for key in (
+                        "cloudflarestorage",
+                        "pixel.hubcloud",
+                        "fuckingfast",
+                    )
+                )
+            ]
+            if generated:
+                return generated
         if gen := tree.xpath("//a[@id='download']/@href"):
             tree = HTML(session.get(gen[0]).text)
         return [
@@ -424,18 +450,37 @@ def _hubcloud_links(session, url):
 
 def _first_alive(session, links):
     fallback = ""
+    links = sorted(
+        links,
+        key=lambda item: (
+            2
+            if "r2.dev" in item
+            else (0 if "cloudflarestorage.com" in item else 1)
+        ),
+    )
     for durl in links:
+        if "r2.dev" in durl:
+            continue
         try:
             if "bzzhr.co" in durl:
                 return buzzheavier(durl)
-            res = session.head(durl, timeout=20)
-            if inner := parse_qs(urlparse(res.url).query).get("link"):
-                durl = inner[0]
-                res = session.head(durl, timeout=20)
-            if res.status_code < 400 and "text/html" not in res.headers.get(
-                "content-type", ""
-            ):
-                return durl
+            probe = session.get(
+                durl,
+                headers={"Range": "bytes=0-0"},
+                timeout=20,
+                allow_redirects=True,
+                stream=True,
+            )
+            final = str(probe.url)
+            if inner := parse_qs(urlparse(final).query).get("link"):
+                final = inner[0]
+            ok = (
+                probe.status_code in (200, 206)
+                and "text/html" not in probe.headers.get("content-type", "")
+            )
+            probe.close()
+            if ok:
+                return final
             fallback = fallback or durl
         except Exception:
             continue
@@ -498,6 +543,100 @@ def hubdrive(url):
         if durl := _first_alive(session, links):
             return durl
     raise DirectDownloadLinkException("ERROR: File Not Found or Expired")
+
+
+def linkshub(url):
+    host = urlparse(url).netloc
+    with CurlSession(impersonate="chrome") as session:
+        res = session.get(url, timeout=40)
+        candidates = []
+        for href in HTML(res.text).xpath("//a/@href"):
+            if href.startswith("/"):
+                href = f"https://{host}{href}"
+            if not href.startswith("http"):
+                continue
+            if urlparse(href).netloc == host:
+                continue
+            if any(
+                key in href
+                for key in (
+                    "drivehub",
+                    "hubdrive",
+                    "hubcloud",
+                    "gofile",
+                    "gdflix",
+                    "pixeldrain",
+                )
+            ) and href not in candidates:
+                candidates.append(href)
+        candidates.sort(key=lambda item: 1 if "drivehub" in item else 0)
+        for candidate in candidates:
+            try:
+                if resolved := direct_link_generator(candidate):
+                    return resolved
+            except Exception:
+                continue
+    raise DirectDownloadLinkException("ERROR: No supported mirror found")
+
+
+def drivehub(url):
+    with CurlSession(impersonate="chrome") as session:
+        res = session.get(url, timeout=40)
+    if "cf-turnstile" in res.text or "verify you are human" in res.text:
+        raise DirectDownloadLinkException(
+            "ERROR: DriveHub requires human verification (Cloudflare Turnstile). "
+            "Use the HubDrive/HubCloud mirror link for this file."
+        )
+    raise DirectDownloadLinkException("ERROR: Download link not found")
+
+
+def hubcdn(url):
+    with CurlSession(impersonate="chrome") as session:
+        res = session.get(url, timeout=40)
+        if not (match_ := search(r'var reurl\s*=\s*"([^"]+)"', res.text)):
+            raise DirectDownloadLinkException("ERROR: Download link not found")
+        target = match_.group(1).replace("\\/", "/")
+        if token := parse_qs(urlparse(target).query).get("r"):
+            try:
+                target = b64decode(token[0] + "=" * (-len(token[0]) % 4)).decode()
+            except Exception:
+                pass
+        final = (parse_qs(urlparse(target).query).get("link") or [target])[0]
+        if "r2.dev" in final:
+            raise DirectDownloadLinkException(
+                "ERROR: HubCDN link requires a browser session "
+                "(the storage URL returns 401 to download clients)."
+            )
+        probe = session.get(
+            final,
+            headers={"Range": "bytes=0-0"},
+            timeout=30,
+            stream=True,
+        )
+        status = probe.status_code
+        probe.close()
+        if status in (200, 206):
+            return final
+        raise DirectDownloadLinkException(
+            "ERROR: HubCDN storage link is private or expired "
+            f"(status={status})"
+        )
+
+
+def vikingfile(url):
+    try:
+        with CurlSession(impersonate="chrome") as session:
+            res = session.get(url, timeout=40)
+    except Exception as error:
+        raise DirectDownloadLinkException(
+            f"ERROR: VikingFile is unreachable from this server: {error}"
+        )
+    if "turnstile" in res.text.lower() or "cloudflarecallback" in res.text.lower():
+        raise DirectDownloadLinkException(
+            "ERROR: VikingFile requires human verification (Cloudflare Turnstile). "
+            "Direct download is not available to the bot."
+        )
+    raise DirectDownloadLinkException("ERROR: Download link not found")
 
 
 def gdflix(url):
