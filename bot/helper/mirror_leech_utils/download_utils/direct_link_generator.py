@@ -5,7 +5,7 @@ from http.cookiejar import MozillaCookieJar
 from json import loads
 from lxml.etree import HTML
 from os import path as ospath
-from re import findall, match, search, sub
+from re import I, findall, match, search, sub
 from requests import Session, post, get
 from requests.adapters import HTTPAdapter
 from time import sleep, time
@@ -526,15 +526,33 @@ def gdflix(url):
             if not details["contents"]:
                 raise DirectDownloadLinkException("ERROR: No files found in pack")
             return details
-        if not (
-            instant := tree.xpath(
-                "//a[contains(@href, 'instant') or contains(@href, 'instadl') "
-                "or contains(translate(normalize-space(.), "
-                "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
-                "'instant dl')]/@href"
+        instant = tree.xpath(
+            "//a[contains(@href, 'instant') or contains(@href, 'instadl') "
+            "or contains(translate(normalize-space(.), "
+            "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+            "'instant dl')]/@href"
+        )
+        if not instant:
+            instant = [
+                href
+                for href in tree.xpath("//@href")
+                if "instadl" in href.lower() or "instant" in href.lower()
+            ]
+        if not instant and (
+            marker := search(
+                r'https?://[^"\'\s<>]*(?:instadl|instant)[^"\'\s<>]*',
+                res.text,
+                I,
             )
         ):
-            raise DirectDownloadLinkException("ERROR: Instant DL link not found")
+            instant = [marker.group(0)]
+        if not instant:
+            raise DirectDownloadLinkException(
+                "ERROR: Instant DL link not found "
+                f"(status={res.status_code}, url={res.url}, "
+                f"len={len(res.text)}, "
+                f"instadl_marker={'instadl' in res.text.lower()})"
+            )
         res = session.get(instant[0], allow_redirects=False)
         if not (loc := res.headers.get("location", "").strip()):
             raise DirectDownloadLinkException("ERROR: File Not Found or Expired")
