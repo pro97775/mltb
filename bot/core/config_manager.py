@@ -14,6 +14,7 @@ class Config:
     BASE_URL_PORT = int(getenv("PORT", "80"))
     BATCH_MAX_SIZE = 0
     BOT_TOKEN = ""
+    BOT_PM = False
     BUZZHEAVIER_ACCOUNT_ID = ""
     BUZZHEAVIER_FOLDER_ID = ""
     GOFILE_API_KEY = ""
@@ -32,7 +33,8 @@ class Config:
     FILES_LINKS = False
     GALLERY_DL_OPTIONS = {}
     GDRIVE_ID = ""
-    INCOMPLETE_TASK_NOTIFIER = False
+    INC_TASK_NOTIFY = False
+    INC_TASK_RESUME = False
     INDEX_URL = ""
     IS_TEAM_DRIVE = False
     JD_EMAIL = ""

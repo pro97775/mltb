@@ -246,7 +246,7 @@ async def edit_variable(_, message, pre_message, key):
         value = True
     elif value.lower() == "false":
         value = False
-        if key == "INCOMPLETE_TASK_NOTIFIER" and Config.DATABASE_URL:
+        if key in ("INC_TASK_NOTIFY", "INC_TASK_RESUME") and Config.DATABASE_URL:
             await database.trunc_table("tasks")
     elif key == "STATUS_UPDATE_INTERVAL":
         value = int(value)
@@ -628,7 +628,7 @@ async def edit_bot_settings(client, query):
         elif data[2] == "INDEX_URL":
             if drives_names and drives_names[0] == "Main":
                 index_urls[0] = ""
-        elif data[2] == "INCOMPLETE_TASK_NOTIFIER":
+        elif data[2] in ("INC_TASK_NOTIFY", "INC_TASK_RESUME"):
             await database.trunc_table("tasks")
         elif data[2] in ["JD_EMAIL", "JD_PASS"]:
             await create_subprocess_exec("pkill", "-9", "-f", "java")
@@ -874,7 +874,7 @@ async def load_config():
         )
         await database.update_aria2("bt-stop-timeout", f"{Config.TORRENT_TIMEOUT}")
 
-    if not Config.INCOMPLETE_TASK_NOTIFIER:
+    if not (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME):
         await database.trunc_table("tasks")
 
     await (await create_subprocess_exec("pkill", "-9", "-f", "gunicorn")).wait()

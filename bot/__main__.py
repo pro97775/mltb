@@ -37,7 +37,6 @@ async def main():
     from .modules import (
         initiate_search_tools,
         get_packages_version,
-        restart_notification,
     )
 
     await gather(
@@ -46,7 +45,6 @@ async def main():
         clean_all(),
         initiate_search_tools(),
         get_packages_version(),
-        restart_notification(),
         telegraph.create_account(),
         rclone_serve_booter(),
     )
@@ -61,6 +59,10 @@ from .core.handlers import add_handlers
 add_aria2_callbacks()
 create_help_buttons()
 add_handlers()
+
+from .modules import restart_notification
+
+bot_loop.run_until_complete(restart_notification())
 
 LOGGER.info(f"Bot Started! @{TgClient.NAME}")
 bot_loop.run_forever()

@@ -5,11 +5,16 @@ from time import time
 from pymongo import AsyncMongoClient, UpdateOne
 from pymongo.server_api import ServerApi
 from pymongo.errors import PyMongoError
+from uuid import uuid4
 
 from ... import LOGGER, user_data, rss_dict, qbit_options
 from ...core.telegram_manager import TgClient
 from ...core.config_manager import Config
 from .file_types import get_batch_file_key
+
+
+def _new_uuid():
+    return uuid4().hex
 
 
 class DbManager:
@@ -190,39 +195,86 @@ class DbManager:
             return
         await self.db.rss[TgClient.ID].delete_one({"_id": user_id})
 
-    async def add_incomplete_task(self, cid, link, tag):
+    async def add_incomplete_task(
+        self, cid, link, tag, command="", user_id=0, reply_to_msg_id=0, thread_id=0
+    ):
         if self._return:
             return
-        await self.db.tasks[TgClient.ID].insert_one(
-            {"_id": link, "cid": cid, "tag": tag}
-        )
+        try:
+            await self.db.tasks[TgClient.ID].update_one(
+                {"link": link},
+                {
+                    "$setOnInsert": {
+                        "_id": _new_uuid(),
+                        "cid": cid,
+                        "tag": tag,
+                        "link": link,
+                        "command": command,
+                        "user_id": user_id,
+                        "reply_to_msg_id": reply_to_msg_id,
+                        "thread_id": thread_id,
+                    }
+                },
+                upsert=True,
+            )
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to save incomplete task {link}: {e}")
 
     async def rm_complete_task(self, link):
         if self._return:
             return
-        await self.db.tasks[TgClient.ID].delete_one({"_id": link})
+        try:
+            await self.db.tasks[TgClient.ID].delete_one({"link": link})
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to remove complete task {link}: {e}")
+
+    async def rm_incomplete_task(self, key):
+        if self._return:
+            return
+        try:
+            await self.db.tasks[TgClient.ID].delete_one({"_id": key})
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to remove incomplete task {key}: {e}")
 
     async def get_incomplete_tasks(self):
         notifier_dict = {}
         if self._return:
             return notifier_dict
-        if await self.db.tasks[TgClient.ID].find_one():
-            rows = self.db.tasks[TgClient.ID].find({})
-            async for row in rows:
-                if row["cid"] in list(notifier_dict.keys()):
-                    if row["tag"] in list(notifier_dict[row["cid"]]):
-                        notifier_dict[row["cid"]][row["tag"]].append(row["_id"])
+        try:
+            if await self.db.tasks[TgClient.ID].find_one():
+                rows = self.db.tasks[TgClient.ID].find({})
+                async for row in rows:
+                    link = row.get("link") or row.get("_id")
+                    if not link:
+                        continue
+                    cid = row["cid"]
+                    tag = row["tag"]
+                    task_data = {
+                        "key": row["_id"],
+                        "link": link,
+                        "command": row.get("command", ""),
+                        "user_id": row.get("user_id", 0),
+                        "reply_to_msg_id": row.get("reply_to_msg_id", 0),
+                        "thread_id": row.get("thread_id", 0),
+                    }
+                    if cid in notifier_dict:
+                        if tag in notifier_dict[cid]:
+                            notifier_dict[cid][tag].append(task_data)
+                        else:
+                            notifier_dict[cid][tag] = [task_data]
                     else:
-                        notifier_dict[row["cid"]][row["tag"]] = [row["_id"]]
-                else:
-                    notifier_dict[row["cid"]] = {row["tag"]: [row["_id"]]}
-        await self.db.tasks[TgClient.ID].drop()
+                        notifier_dict[cid] = {tag: [task_data]}
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to load incomplete tasks: {e}")
         return notifier_dict
 
     async def trunc_table(self, name):
         if self._return:
             return
-        await self.db[name][TgClient.ID].drop()
+        try:
+            await self.db[name][TgClient.ID].drop()
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to truncate {name}: {e}")
 
 
     async def mark_batch_files_downloaded(self, user_id, engine, hash_, files):

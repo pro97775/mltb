@@ -77,6 +77,7 @@ class TaskConfig:
         self.up_dir = ""
         self.link = ""
         self.up_dest = ""
+        self.leech_dest = ""
         self.rc_flags = ""
         self.tag = ""
         self.name = ""
@@ -138,6 +139,8 @@ class TaskConfig:
         self.as_doc = False
         self.is_file = False
         self.bot_trans = False
+        self.bot_pm = Config.BOT_PM or self.user_dict.get("BOT_PM")
+        self.pm_msg = None
         self.user_trans = False
         self.is_rss = getattr(self.message, "_rss_trigger", False)
         self.progress = True
@@ -432,15 +435,31 @@ class TaskConfig:
                 ) != self.get_config_path(self.up_dest):
                     raise ValueError("You must use the same config to clone!")
         elif not self.is_buzzheavier and not self.is_gofile:
-            self.up_dest = (
-                self.up_dest
-                or self.user_dict.get("LEECH_DUMP_CHAT")
-                or (
-                    Config.LEECH_DUMP_CHAT
-                    if "LEECH_DUMP_CHAT" not in self.user_dict
-                    else None
+            self.leech_dest = self.up_dest or self.user_dict.get("LEECH_DUMP_CHAT")
+            self.up_dest = Config.LEECH_DUMP_CHAT
+            if isinstance(self.leech_dest, str):
+                leech_chat = self.leech_dest.split("|", 1)[0].strip()
+                if leech_chat[:2].lower() in ("b:", "u:", "h:"):
+                    leech_chat = leech_chat[2:].strip()
+                if leech_chat.lower() == "pm":
+                    self.leech_dest = self.user_id
+                elif leech_chat.lstrip("-").isdigit():
+                    self.leech_dest = int(leech_chat)
+                else:
+                    self.leech_dest = leech_chat
+            if (
+                not self.bot_pm
+                and self.message.chat.type.name not in ("PRIVATE", "BOT")
+                and not self.leech_dest
+            ):
+                raise ValueError(
+                    "❗ <b>Leech Destination required</b>\n\n"
+                    "You are using a leech command in a group without a dump chat. "
+                    "Set <b>Leech Destination</b> from /usettings → Leech "
+                    "(chat id, @username or <code>pm</code>), or pass "
+                    "<code>-up &lt;chat&gt;</code> with the command.\n"
+                    "This is mandatory while <b>BOT_PM</b> is disabled by the owner."
                 )
-            )
             self.hybrid_leech = TgClient.IS_PREMIUM_USER and (
                 self.user_dict.get("HYBRID_LEECH")
                 or Config.HYBRID_LEECH
@@ -640,6 +659,9 @@ class TaskConfig:
                 self.thumb = (
                     await create_thumb(msg) if msg.photo or msg.document else ""
                 )
+
+    def get_task_link(self):
+        return self.message.link or f"{self.message.chat.id}:{self.message.id}"
 
     async def get_tag(self, text: list):
         if self.user:

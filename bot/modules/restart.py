@@ -1,11 +1,12 @@
 from sys import executable
+from datetime import datetime
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath, remove
 from asyncio import gather, create_subprocess_exec
 from os import execl as osexecl
 
 from .. import intervals, scheduler, sabnzbd_client, LOGGER
-from ..helper.ext_utils.bot_utils import new_task
+from ..helper.ext_utils.bot_utils import new_task, resolve_command
 from ..helper.telegram_helper.message_utils import (
     send_message,
     delete_message,
@@ -28,21 +29,24 @@ async def restart_bot(_, message):
     await send_message(message, "Are you sure you want to restart the bot ?!", button)
 
 
-async def send_incomplete_task_message(cid, msg_id, msg):
+def _restart_header(now, is_restart_chat=False):
+    title = "Restarted Successfully!" if is_restart_chat else "Bot Restarted!"
+    return (
+        f"⌬ <b><i>{title}</i></b>\n"
+        f"┟ <b>Date:</b> {now.strftime('%d/%m/%y')}\n"
+        f"┠ <b>Time:</b> {now.strftime('%I:%M:%S %p')}\n"
+        f"┠ <b>Branch:</b> {Config.UPSTREAM_BRANCH}"
+    )
+
+
+async def _send_msg(cid, msg):
     try:
-        if msg.startswith("Restarted Successfully!"):
-            await TgClient.bot.edit_message_text(
-                chat_id=cid,
-                message_id=msg_id,
-                text=msg,
-            )
-            await remove(".restartmsg")
-        else:
-            await TgClient.bot.send_message(
-                chat_id=cid,
-                text=msg,
-                disable_notification=True,
-            )
+        await TgClient.bot.send_message(
+            chat_id=cid,
+            text=msg,
+            disable_web_page_preview=True,
+            disable_notification=True,
+        )
     except Exception as e:
         LOGGER.error(e)
 
@@ -54,28 +58,103 @@ async def restart_notification():
     else:
         chat_id, msg_id = 0, 0
 
-    if Config.INCOMPLETE_TASK_NOTIFIER and Config.DATABASE_URL:
+    now = datetime.now()
+
+    if Config.DATABASE_URL and (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME):
         if notifier_dict := await database.get_incomplete_tasks():
-            for cid, data in notifier_dict.items():
-                msg = "Restarted Successfully!" if cid == chat_id else "Bot Restarted!"
-                for tag, links in data.items():
-                    msg += f"\n\n{tag}: "
-                    for index, link in enumerate(links, start=1):
-                        msg += f" <a href='{link}'>{index}</a> |"
-                        if len(msg.encode()) > 4000:
-                            await send_incomplete_task_message(cid, msg_id, msg)
-                            msg = ""
-                if msg:
-                    await send_incomplete_task_message(cid, msg_id, msg)
+            if Config.INC_TASK_RESUME:
+                await _resume_tasks(notifier_dict)
+            if Config.INC_TASK_NOTIFY:
+                await _notify_tasks(notifier_dict, chat_id, now)
+            if not Config.INC_TASK_RESUME:
+                await database.trunc_table("tasks")
 
     if await aiopath.isfile(".restartmsg"):
         try:
             await TgClient.bot.edit_message_text(
-                chat_id=chat_id, message_id=msg_id, text="Restarted Successfully!"
+                chat_id=chat_id,
+                message_id=msg_id,
+                text=_restart_header(now, is_restart_chat=True),
+                disable_web_page_preview=True,
             )
-        except:
-            pass
+        except Exception as e:
+            LOGGER.error(e)
         await remove(".restartmsg")
+
+
+async def _notify_tasks(notifier_dict, restart_chat_id, now):
+    for cid, data in notifier_dict.items():
+        is_restart_chat = cid == restart_chat_id
+        header = _restart_header(now, is_restart_chat)
+        msg = header + "\n\n⌬ <b><i>Incomplete Tasks!</i></b>"
+        for tag, tasks in data.items():
+            entry = f"\n➲ <b>User:</b> {tag}\n┖ <b>Tasks:</b>"
+            for index, task in enumerate(tasks, start=1):
+                link = task.get("link", "")
+                if link.startswith("http"):
+                    entry += f" {index}. <a href='{link}'>L</a> |"
+                else:
+                    entry += f" {index}. L |"
+            if len((msg + entry).encode()) > 4000:
+                await _send_msg(cid, msg)
+                msg = header
+            msg += entry
+        if msg:
+            await _send_msg(cid, msg)
+
+
+async def _resume_tasks(notifier_dict):
+    for cid, data in notifier_dict.items():
+        for tag, tasks in data.items():
+            for task in tasks:
+                command = task.get("command", "")
+                user_id = task.get("user_id", 0)
+                reply_to_msg_id = task.get("reply_to_msg_id", 0)
+                thread_id = task.get("thread_id", 0)
+                if not command or not user_id:
+                    LOGGER.warning(
+                        f"Resume: skipping task in {cid} "
+                        f"(command={command!r}, user_id={user_id})"
+                    )
+                    continue
+                try:
+                    user = await TgClient.bot.get_users(user_id)
+                except Exception as e:
+                    LOGGER.warning(f"Resume: cannot get user {user_id}: {e}")
+                    continue
+                handler = resolve_command(command)
+                if handler is None:
+                    continue
+                try:
+                    LOGGER.info(f"Resume: starting {command!r} in {cid}")
+                    msg = await TgClient.bot.send_message(
+                        chat_id=cid,
+                        text=command,
+                        disable_notification=True,
+                        message_thread_id=thread_id or None,
+                    )
+                    msg.text = command
+                    msg.from_user = user
+                    if reply_to_msg_id:
+                        try:
+                            reply_msg = await TgClient.bot.get_messages(
+                                chat_id=cid, message_ids=reply_to_msg_id
+                            )
+                            if reply_msg:
+                                msg.reply_to_message = reply_msg
+                                msg.reply_to_message_id = reply_msg.id
+                        except Exception as e:
+                            LOGGER.warning(
+                                f"Resume: cannot fetch reply msg {reply_to_msg_id}: {e}"
+                            )
+                    await handler(TgClient.bot, msg)
+                    key = task.get("key")
+                    if key:
+                        await database.rm_incomplete_task(key)
+                    else:
+                        await database.rm_complete_task(task.get("link"))
+                except Exception as e:
+                    LOGGER.error(f"Resume: failed for '{command}' in {cid}: {e}")
 
 
 @new_task
