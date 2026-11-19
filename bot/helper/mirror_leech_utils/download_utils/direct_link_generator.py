@@ -542,6 +542,33 @@ def gdflix(url):
                 links = [marker.group(0)]
             return links
 
+        def usable_link(link):
+            try:
+                probe = session.get(
+                    link,
+                    headers={"Range": "bytes=0-0"},
+                    timeout=30,
+                    stream=True,
+                )
+                status = probe.status_code
+                probe.close()
+                return status in (200, 206)
+            except Exception:
+                return False
+
+        def wfile_link():
+            wfile_url = url.replace("/file/", "/wfile/", 1)
+            page = session.get(wfile_url, timeout=40)
+            if page.status_code != 200:
+                page = via_reader(wfile_url) or page
+            links = HTML(page.text).xpath(
+                "//a[normalize-space(.)='Download']/@href"
+            )
+            for link in links:
+                if usable_link(link):
+                    return link
+            return links[0] if links else None
+
         res = session.get(url, timeout=40)
         proxied = False
         if res.status_code != 200:
@@ -572,6 +599,8 @@ def gdflix(url):
             if not details["contents"]:
                 raise DirectDownloadLinkException("ERROR: No files found in pack")
             return details
+        if wfile := wfile_link():
+            return wfile
         instant = instant_links(tree, res.text)
         if not instant and not proxied:
             if reader := via_reader(url):
