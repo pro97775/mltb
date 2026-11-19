@@ -30,7 +30,7 @@ from ....core.config_manager import Config
 from ....core.telegram_manager import TgClient
 from ...ext_utils.bot_utils import sync_to_async
 from ...ext_utils.files_utils import is_archive, get_base_name
-from ...telegram_helper.message_utils import delete_message
+from ...telegram_helper.message_utils import delete_message, send_message
 from ...ext_utils.media_utils import (
     get_media_info,
     get_document_type,
@@ -60,6 +60,8 @@ class TelegramUploader:
         self._media_group = False
         self._is_private = False
         self._sent_msg = None
+        self._log_msg = None
+        self._bot_pm = False
         self._user_session = self._listener.user_transmission
         self._error = ""
         self._base_msg = None
@@ -93,6 +95,7 @@ class TelegramUploader:
             if "FILES_LINKS" not in self._listener.user_dict
             else False
         )
+        self._bot_pm = self._listener.user_dict.get("BOT_PM") or Config.BOT_PM
 
     async def _msg_to_reply(self):
         if self._listener.up_dest:
@@ -117,11 +120,30 @@ class TelegramUploader:
                         disable_notification=True,
                     )
                     self._is_private = self._sent_msg.chat.type.name == "PRIVATE"
+                self._log_msg = self._sent_msg
             except Exception as e:
                 await self._listener.on_upload_error(str(e))
                 return False
             finally:
                 self._base_msg = self._sent_msg
+            if self._listener.leech_dest:
+                try:
+                    leech_dest = self._listener.leech_dest
+                    if not isinstance(leech_dest, int):
+                        if "|" in str(leech_dest):
+                            leech_dest, _ = str(leech_dest).split("|", 1)
+                        if str(leech_dest).lstrip("-").isdigit():
+                            leech_dest = int(leech_dest)
+                    await self._log_msg.copy(chat_id=leech_dest)
+                except Exception as e:
+                    if not self._listener.is_cancelled:
+                        LOGGER.error(
+                            f"Failed to copy 'Leech Started' message to {self._listener.leech_dest}: {e}"
+                        )
+                        await send_message(
+                            self._listener.user_id,
+                            f"Failed to send 'Leech Started' message to {self._listener.leech_dest}\n{e}",
+                        )
         elif self._user_session:
             self._sent_msg = await TgClient.user.get_messages(
                 chat_id=self._listener.message.chat.id, message_ids=self._listener.mid
@@ -187,6 +209,12 @@ class TelegramUploader:
         ]
         for i in range(0, len(inputs), 10):
             batch = inputs[i : i + 10]
+            if Config.BOT_PM:
+                await TgClient.bot.send_media_group(
+                    chat_id=self._listener.user_id,
+                    media=batch,
+                    disable_notification=True,
+                )
             self._sent_msg = (
                 await self._sent_msg.reply_media_group(
                     media=batch,
@@ -222,6 +250,23 @@ class TelegramUploader:
         if self._base_msg:
             await delete_message(self._base_msg)
             self._base_msg = None
+
+    async def _copy_media(self):
+        try:
+            if self._bot_pm:
+                await TgClient.bot.copy_message(
+                    chat_id=self._listener.user_id,
+                    from_chat_id=self._sent_msg.chat.id,
+                    message_id=self._sent_msg.id,
+                    reply_to_message_id=(
+                        self._listener.pm_msg.id
+                        if self._listener.pm_msg
+                        else None
+                    ),
+                )
+        except Exception as err:
+            if not self._listener.is_cancelled:
+                LOGGER.error(f"Failed To Send in BotPM:\n{str(err)}")
 
     async def upload(self):
         await self._user_settings()
@@ -301,6 +346,30 @@ class TelegramUploader:
                                 LOGGER.error(
                                     f"Can't forward message to clone dump chat: {ch}. Error: {e}"
                                 )
+                    if self._sent_msg:
+                        await self._copy_media()
+                        if self._listener.leech_dest:
+                            try:
+                                leech_dest = self._listener.leech_dest
+                                if not isinstance(leech_dest, int):
+                                    if "|" in str(leech_dest):
+                                        leech_dest, _ = str(leech_dest).split("|", 1)
+                                    if str(leech_dest).lstrip("-").isdigit():
+                                        leech_dest = int(leech_dest)
+                                await TgClient.bot.copy_message(
+                                    chat_id=leech_dest,
+                                    from_chat_id=self._sent_msg.chat.id,
+                                    message_id=self._sent_msg.id,
+                                )
+                            except Exception as e:
+                                if not self._listener.is_cancelled:
+                                    LOGGER.error(
+                                        f"Failed to forward to {self._listener.leech_dest}: {e}"
+                                    )
+                                    await send_message(
+                                        self._listener.user_id,
+                                        f"Failed to forward to {self._listener.leech_dest}\n{e}",
+                                    )
                     if self._listener.is_cancelled:
                         return
                     if (
