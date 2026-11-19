@@ -85,13 +85,42 @@ class TaskListener(TaskConfig):
                 self.same_dir[self.folder_name]["total"] -= 1
 
     async def on_download_start(self):
-        if (
-            self.is_super_chat
-            and Config.INCOMPLETE_TASK_NOTIFIER
-            and Config.DATABASE_URL
-        ):
+        if self.bot_pm and self.is_super_chat:
+            self.pm_msg = await send_message(
+                self.user_id,
+                f"""➲ <b><u>Task Started :</u></b>
+┃
+┖ <b>Link:</b> <a href='{self.message.link}'>Click Here</a>
+""",
+            )
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
+            command = self.message.text or self.message.caption or ""
+            if self.message.reply_to_message:
+                reply_to_msg_id = self.message.reply_to_message.id
+            elif any(
+                getattr(self.message, attr, None)
+                for attr in (
+                    "document",
+                    "photo",
+                    "video",
+                    "audio",
+                    "voice",
+                    "video_note",
+                    "sticker",
+                    "animation",
+                )
+            ):
+                reply_to_msg_id = self.message.id
+            else:
+                reply_to_msg_id = 0
             await database.add_incomplete_task(
-                self.message.chat.id, self.message.link, self.tag
+                self.message.chat.id,
+                self.get_task_link(),
+                self.tag,
+                command,
+                self.user_id,
+                reply_to_msg_id,
+                getattr(self.message, "message_thread_id", 0) or 0,
             )
 
     async def on_download_complete(self):
@@ -350,12 +379,8 @@ class TaskListener(TaskConfig):
     async def on_upload_complete(
         self, link, files, folders, mime_type, rclone_path="", dir_id=""
     ):
-        if (
-            self.is_super_chat
-            and Config.INCOMPLETE_TASK_NOTIFIER
-            and Config.DATABASE_URL
-        ):
-            await database.rm_complete_task(self.message.link)
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
+            await database.rm_complete_task(self.get_task_link())
         msg = f"<b>Name: </b><code>{escape(self.name)}</code>\n\n<b>Size: </b>{get_readable_file_size(self.size)}"
         LOGGER.info(f"Task Done: {self.name}")
         if self.is_leech:
@@ -363,18 +388,26 @@ class TaskListener(TaskConfig):
             if mime_type != 0:
                 msg += f"\n<b>Corrupted Files: </b>{mime_type}"
             msg += f"\n<b>cc: </b>{self.tag}\n\n"
-            if not files:
+            if self.bot_pm:
+                pmsg = msg
+                pmsg += "〶 <b><u>Action Performed :</u></b>\n"
+                pmsg += "⋗ <i>File(s) have been sent to User PM</i>\n\n"
+                if self.is_super_chat:
+                    await send_message(self.message, pmsg)
+            if not files and not self.is_super_chat:
                 await send_message(self.message, msg)
             else:
+                log_chat = self.user_id if self.bot_pm else self.message
+                msg += "〶 <b><u>Files List :</u></b>\n"
                 fmsg = ""
                 for index, (link, name) in enumerate(files.items(), start=1):
                     fmsg += f"{index}. <a href='{link}'>{name}</a>\n"
                     if len(fmsg.encode() + msg.encode()) > 4000:
-                        await send_message(self.message, msg + fmsg)
+                        await send_message(log_chat, msg + fmsg)
                         await sleep(1)
                         fmsg = ""
                 if fmsg != "":
-                    await send_message(self.message, msg + fmsg)
+                    await send_message(log_chat, msg + fmsg)
         else:
             msg += f"\n\n<b>Type: </b>{mime_type}"
             if mime_type == "Folder":
@@ -488,12 +521,8 @@ class TaskListener(TaskConfig):
         else:
             await update_status_message(self.message.chat.id)
 
-        if (
-            self.is_super_chat
-            and Config.INCOMPLETE_TASK_NOTIFIER
-            and Config.DATABASE_URL
-        ):
-            await database.rm_complete_task(self.message.link)
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
+            await database.rm_complete_task(self.get_task_link())
 
         async with queue_dict_lock:
             if self.mid in queued_dl:
@@ -526,12 +555,8 @@ class TaskListener(TaskConfig):
         else:
             await update_status_message(self.message.chat.id)
 
-        if (
-            self.is_super_chat
-            and Config.INCOMPLETE_TASK_NOTIFIER
-            and Config.DATABASE_URL
-        ):
-            await database.rm_complete_task(self.message.link)
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
+            await database.rm_complete_task(self.get_task_link())
 
         async with queue_dict_lock:
             if self.mid in queued_dl:

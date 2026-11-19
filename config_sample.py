@@ -4,6 +4,7 @@ OWNER_ID = 0
 TELEGRAM_API = 0
 TELEGRAM_HASH = ""
 # OPTIONAL CONFIG
+BOT_PM = False
 TG_PROXY = {}
 USER_SESSION_STRING = ""
 CMD_SUFFIX = ""
@@ -21,9 +22,13 @@ BUZZHEAVIER_ACCOUNT_ID = ""
 BUZZHEAVIER_FOLDER_ID = ""
 GOFILE_API_KEY = ""
 TLDV_TOKEN = ""
+# Instagram downloader API token (optional)
+INSTADL_API = ""
 EXCLUDED_EXTENSIONS = ""
 INCLUDED_EXTENSIONS = ""
-INCOMPLETE_TASK_NOTIFIER = False
+# Notify about incomplete tasks after restart / auto-resume them
+INC_TASK_NOTIFY = False
+INC_TASK_RESUME = False
 YT_DLP_OPTIONS = ""
 GALLERY_DL_OPTIONS = ""
 USE_SERVICE_ACCOUNTS = False
