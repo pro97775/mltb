@@ -21,7 +21,6 @@ from ..helper.telegram_helper.message_utils import send_message
 commands = {
     "aria2": ([BinConfig.ARIA2_NAME, "--version"], r"aria2 version ([\d.]+)"),
     "qBittorrent": ([BinConfig.QBIT_NAME, "--version"], r"qBittorrent v([\d.]+)"),
-    "SABnzbd+": ([BinConfig.SABNZBD_NAME, "--version"], rf"{BinConfig.SABNZBD_NAME}-([\d.]+)"),
     "python": (["python3", "--version"], r"Python ([\d.]+)"),
     "rclone": ([BinConfig.RCLONE_NAME, "--version"], r"rclone v([\d.]+)"),
     "yt-dlp": (["yt-dlp", "--version"], r"([\d.]+)"),
@@ -67,7 +66,6 @@ async def bot_stats(_, message):
 <b>python:</b> {commands["python"]}
 <b>aria2:</b> {commands["aria2"]}
 <b>qBittorrent:</b> {commands["qBittorrent"]}
-<b>SABnzbd+:</b> {commands["SABnzbd+"]}
 <b>rclone:</b> {commands["rclone"]}
 <b>yt-dlp:</b> {commands["yt-dlp"]}
 <b>ffmpeg:</b> {commands["ffmpeg"]}

@@ -77,6 +77,7 @@ class TaskConfig:
         self.up_dir = ""
         self.link = ""
         self.up_dest = ""
+        self.leech_dest = ""
         self.rc_flags = ""
         self.tag = ""
         self.name = ""
@@ -95,8 +96,6 @@ class TaskConfig:
         self._torbox_web_id = 0
         self.is_leech = False
         self.is_qbit = False
-        self.is_nzb = False
-        self.is_jd = False
         self.is_clone = False
         self.is_ytdlp = False
         self.is_gallerydl = False
@@ -138,6 +137,8 @@ class TaskConfig:
         self.as_doc = False
         self.is_file = False
         self.bot_trans = False
+        self.bot_pm = Config.BOT_PM or self.user_dict.get("BOT_PM")
+        self.pm_msg = None
         self.user_trans = False
         self.is_rss = getattr(self.message, "_rss_trigger", False)
         self.progress = True
@@ -266,26 +267,25 @@ class TaskConfig:
             elif "RCLONE_FLAGS" not in self.user_dict and Config.RCLONE_FLAGS:
                 self.rc_flags = Config.RCLONE_FLAGS
         if self.link not in ["rcl", "gdl"]:
-            if not self.is_jd:
-                if is_rclone_path(self.link):
-                    if not self.link.startswith("mt:") and self.user_dict.get(
-                        "USER_TOKENS", False
-                    ):
-                        self.link = f"mt:{self.link}"
-                    await self.is_token_exists(self.link, "dl")
-                elif is_gdrive_link(self.link):
-                    if not self.link.startswith(
-                        ("mt:", "tp:", "sa:")
-                    ) and self.user_dict.get("USER_TOKENS", False):
-                        self.link = f"mt:{self.link}"
-                    await self.is_token_exists(self.link, "dl")
+            if is_rclone_path(self.link):
+                if not self.link.startswith("mt:") and self.user_dict.get(
+                    "USER_TOKENS", False
+                ):
+                    self.link = f"mt:{self.link}"
+                await self.is_token_exists(self.link, "dl")
+            elif is_gdrive_link(self.link):
+                if not self.link.startswith(
+                    ("mt:", "tp:", "sa:")
+                ) and self.user_dict.get("USER_TOKENS", False):
+                    self.link = f"mt:{self.link}"
+                await self.is_token_exists(self.link, "dl")
         elif self.link == "rcl":
-            if not self.is_ytdlp and not self.is_jd and not self.is_gallerydl:
+            if not self.is_ytdlp and not self.is_gallerydl:
                 self.link = await RcloneList(self).get_rclone_path("rcd")
                 if not is_rclone_path(self.link):
                     raise ValueError(self.link)
         elif self.link == "gdl":
-            if not self.is_ytdlp and not self.is_jd and not self.is_gallerydl:
+            if not self.is_ytdlp and not self.is_gallerydl:
                 self.link = await GoogleDriveList(self).get_target_id("gdd")
                 if not is_gdrive_id(self.link):
                     raise ValueError(self.link)
@@ -432,15 +432,31 @@ class TaskConfig:
                 ) != self.get_config_path(self.up_dest):
                     raise ValueError("You must use the same config to clone!")
         elif not self.is_buzzheavier and not self.is_gofile:
-            self.up_dest = (
-                self.up_dest
-                or self.user_dict.get("LEECH_DUMP_CHAT")
-                or (
-                    Config.LEECH_DUMP_CHAT
-                    if "LEECH_DUMP_CHAT" not in self.user_dict
-                    else None
+            self.leech_dest = self.up_dest or self.user_dict.get("LEECH_DUMP_CHAT")
+            self.up_dest = Config.LEECH_DUMP_CHAT
+            if isinstance(self.leech_dest, str):
+                leech_chat = self.leech_dest.split("|", 1)[0].strip()
+                if leech_chat[:2].lower() in ("b:", "u:", "h:"):
+                    leech_chat = leech_chat[2:].strip()
+                if leech_chat.lower() == "pm":
+                    self.leech_dest = self.user_id
+                elif leech_chat.lstrip("-").isdigit():
+                    self.leech_dest = int(leech_chat)
+                else:
+                    self.leech_dest = leech_chat
+            if (
+                not self.bot_pm
+                and self.message.chat.type.name not in ("PRIVATE", "BOT")
+                and not self.leech_dest
+            ):
+                raise ValueError(
+                    "❗ <b>Leech Destination required</b>\n\n"
+                    "You are using a leech command in a group without a dump chat. "
+                    "Set <b>Leech Destination</b> from /usettings → Leech "
+                    "(chat id, @username or <code>pm</code>), or pass "
+                    "<code>-up &lt;chat&gt;</code> with the command.\n"
+                    "This is mandatory while <b>BOT_PM</b> is disabled by the owner."
                 )
-            )
             self.hybrid_leech = TgClient.IS_PREMIUM_USER and (
                 self.user_dict.get("HYBRID_LEECH")
                 or Config.HYBRID_LEECH
@@ -641,6 +657,9 @@ class TaskConfig:
                     await create_thumb(msg) if msg.photo or msg.document else ""
                 )
 
+    def get_task_link(self):
+        return self.message.link or f"{self.message.chat.id}:{self.message.id}"
+
     async def get_tag(self, text: list):
         if self.user:
             if username := self.user.username:
@@ -706,8 +725,6 @@ class TaskConfig:
             nextmsg,
             self.is_qbit,
             self.is_leech,
-            self.is_jd,
-            self.is_nzb,
             self.same_dir,
             self.bulk,
             self.multi_tag,
@@ -742,8 +759,6 @@ class TaskConfig:
                 nextmsg,
                 self.is_qbit,
                 self.is_leech,
-                self.is_jd,
-                self.is_nzb,
                 self.same_dir,
                 self.bulk,
                 self.multi_tag,

@@ -9,7 +9,9 @@ from asyncio import (
     sleep,
 )
 
-from ... import user_data, bot_loop
+from pyrogram.handlers import MessageHandler
+
+from ... import user_data, bot_loop, LOGGER
 from ...core.config_manager import Config
 from ..telegram_helper.button_build import ButtonMaker
 from .telegraph_helper import telegraph
@@ -260,3 +262,41 @@ def loop_thread(func):
         return future.result() if wait else future
 
     return wrapper
+
+
+def _find_command_filters(flt):
+    if hasattr(flt, "commands"):
+        yield flt
+    for attr in ("base", "other"):
+        if child := getattr(flt, attr, None):
+            yield from _find_command_filters(child)
+
+
+def _build_command_map():
+    from ...core.telegram_manager import TgClient
+
+    mapping = {}
+    for group in TgClient.bot.dispatcher.groups.values():
+        for handler in group:
+            if not isinstance(handler, MessageHandler):
+                continue
+            if handler.filters is None:
+                continue
+            for cmd_filter in _find_command_filters(handler.filters):
+                for cmd in cmd_filter.commands:
+                    mapping[cmd] = handler.callback
+    return mapping
+
+
+def resolve_command(command_str):
+    cmd_name = command_str.strip().lstrip("/")
+    if not cmd_name:
+        return None
+    cmd_name = cmd_name.split(maxsplit=1)[0].split("@", 1)[0]
+    mapping = _build_command_map()
+    handler = mapping.get(cmd_name)
+    if handler is None and Config.CMD_SUFFIX:
+        handler = mapping.get(cmd_name + Config.CMD_SUFFIX)
+    if handler is None:
+        LOGGER.warning(f"Unknown command '{cmd_name}' (from '{command_str}')")
+    return handler

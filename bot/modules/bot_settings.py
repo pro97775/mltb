@@ -15,7 +15,6 @@ from pyrogram.handlers import MessageHandler
 from time import time
 
 from .. import (
-    LOGGER,
     drives_ids,
     drives_names,
     index_urls,
@@ -23,9 +22,6 @@ from .. import (
     aria2_options,
     task_dict,
     qbit_options,
-    sabnzbd_client,
-    nzb_options,
-    jd_listener_lock,
     excluded_extensions,
     included_extensions,
     auth_chats,
@@ -38,9 +34,8 @@ from ..helper.ext_utils.bot_utils import (
 from ..core.config_manager import Config, BinConfig
 from ..core.telegram_manager import TgClient
 from ..core.torrent_manager import TorrentManager
-from ..core.startup import update_qb_options, update_nzb_options, update_variables
+from ..core.startup import update_qb_options, update_variables
 from ..helper.ext_utils.db_handler import database
-from ..core.jdownloader_booter import jdownloader
 from ..helper.ext_utils.task_manager import start_from_queued
 from ..helper.mirror_leech_utils.rclone_utils.serve import rclone_serve_booter
 from ..helper.telegram_helper.button_build import ButtonMaker
@@ -74,8 +69,6 @@ async def get_buttons(key=None, edit_type=None):
         buttons.data_button("Private Files", "botset private")
         buttons.data_button("Qbit Settings", "botset qbit")
         buttons.data_button("Aria2c Settings", "botset aria")
-        buttons.data_button("Sabnzbd Settings", "botset nzb")
-        buttons.data_button("JDownloader Sync", "botset syncjd")
         buttons.data_button("Close", "botset close")
         msg = "Bot Settings:"
     elif edit_type is not None:
@@ -111,22 +104,6 @@ async def get_buttons(key=None, edit_type=None):
             buttons.data_button("Empty String", f"botset emptyqbit {key}")
             buttons.data_button("Close", "botset close")
             msg = f"Send a valid value for {key}. Current value is '{qbit_options[key]}'. Timeout: 60 sec"
-        elif edit_type == "nzbvar":
-            buttons.data_button("Back", "botset nzb")
-            buttons.data_button("Default", f"botset resetnzb {key}")
-            buttons.data_button("Empty String", f"botset emptynzb {key}")
-            buttons.data_button("Close", "botset close")
-            msg = f"Send a valid value for {key}. Current value is '{nzb_options[key]}'.\nIf the value is list then separate them by space or ,\nExample: .exe,info or .exe .info\nTimeout: 60 sec"
-        elif edit_type.startswith("nzbsevar"):
-            index = 0 if key == "newser" else int(edit_type.replace("nzbsevar", ""))
-            if key == "newser":
-                buttons.data_button("Back", "botset nzbserver")
-                msg = "Send one server as dictionary {}, like in config.py without []. Timeout: 60 sec"
-            else:
-                buttons.data_button("Empty", f"botset emptyserkey {index} {key}")
-                buttons.data_button("Back", f"botset nzbser{index}")
-                msg = f"Send a valid value for {key} in server {Config.USENET_SERVERS[index]['name']}. Current value is {Config.USENET_SERVERS[index][key]}. Timeout: 60 sec"
-            buttons.data_button("Close", "botset close")
     elif key == "var":
         conf_dict = Config.get_all()
         for k in list(conf_dict.keys())[start : 10 + start]:
@@ -182,53 +159,6 @@ Timeout: 60 sec"""
                 f"{int(x / 10)}", f"botset start qbit {x}", position="footer"
             )
         msg = f"Qbittorrent Options | Page: {int(start / 10)} | State: {state}"
-    elif key == "nzb":
-        for k in list(nzb_options.keys())[start : 10 + start]:
-            buttons.data_button(k, f"botset nzbvar {k}")
-        if state == "view":
-            buttons.data_button("Edit", "botset edit nzb")
-        else:
-            buttons.data_button("View", "botset view nzb")
-        buttons.data_button("Servers", "botset nzbserver")
-        buttons.data_button("Sync Sabnzbd", "botset syncnzb")
-        buttons.data_button("Back", "botset back")
-        buttons.data_button("Close", "botset close")
-        for x in range(0, len(nzb_options), 10):
-            buttons.data_button(
-                f"{int(x / 10)}", f"botset start nzb {x}", position="footer"
-            )
-        msg = f"Sabnzbd Options | Page: {int(start / 10)} | State: {state}"
-    elif key == "nzbserver":
-        if len(Config.USENET_SERVERS) > 0:
-            for index, k in enumerate(Config.USENET_SERVERS[start : 10 + start]):
-                buttons.data_button(k["name"], f"botset nzbser{index}")
-        buttons.data_button("Add New", "botset nzbsevar newser")
-        buttons.data_button("Back", "botset nzb")
-        buttons.data_button("Close", "botset close")
-        if len(Config.USENET_SERVERS) > 10:
-            for x in range(0, len(Config.USENET_SERVERS), 10):
-                buttons.data_button(
-                    f"{int(x / 10)}", f"botset start nzbser {x}", position="footer"
-                )
-        msg = f"Usenet Servers | Page: {int(start / 10)} | State: {state}"
-    elif key.startswith("nzbser"):
-        index = int(key.replace("nzbser", ""))
-        for k in list(Config.USENET_SERVERS[index].keys())[start : 10 + start]:
-            buttons.data_button(k, f"botset nzbsevar{index} {k}")
-        if state == "view":
-            buttons.data_button("Edit", f"botset edit {key}")
-        else:
-            buttons.data_button("View", f"botset view {key}")
-        buttons.data_button("Remove Server", f"botset remser {index}")
-        buttons.data_button("Back", "botset nzbserver")
-        buttons.data_button("Close", "botset close")
-        if len(Config.USENET_SERVERS[index].keys()) > 10:
-            for x in range(0, len(Config.USENET_SERVERS[index]), 10):
-                buttons.data_button(
-                    f"{int(x / 10)}", f"botset start {key} {x}", position="footer"
-                )
-        msg = f"Server Keys | Page: {int(start / 10)} | State: {state}"
-
     button = buttons.build_menu(1) if key is None else buttons.build_menu(2)
     return msg, button
 
@@ -246,7 +176,7 @@ async def edit_variable(_, message, pre_message, key):
         value = True
     elif value.lower() == "false":
         value = False
-        if key == "INCOMPLETE_TASK_NOTIFIER" and Config.DATABASE_URL:
+        if key in ("INC_TASK_NOTIFY", "INC_TASK_RESUME") and Config.DATABASE_URL:
             await database.trunc_table("tasks")
     elif key == "STATUS_UPDATE_INTERVAL":
         value = int(value)
@@ -328,13 +258,8 @@ async def edit_variable(_, message, pre_message, key):
         "RCLONE_SERVE_PASS",
     ]:
         await rclone_serve_booter()
-    elif key in ["JD_EMAIL", "JD_PASS"]:
-        await jdownloader.boot()
     elif key == "RSS_DELAY":
         add_job()
-    elif key == "USENET_SERVERS":
-        for s in value:
-            await sabnzbd_client.set_special_config("servers", s)
 
 
 @new_task
@@ -370,77 +295,6 @@ async def edit_qbit(_, message, pre_message, key):
     await update_buttons(pre_message, "qbit")
     await delete_message(message)
     await database.update_qbittorrent(key, value)
-
-
-@new_task
-async def edit_nzb(_, message, pre_message, key):
-    handler_dict[message.chat.id] = False
-    value = str(message.text)
-    if value.isdigit():
-        value = int(value)
-    elif value.startswith("[") and value.endswith("]"):
-        try:
-            value = ",".join(eval(value))
-        except Exception as e:
-            LOGGER.error(e)
-            await update_buttons(pre_message, "nzb")
-            return
-    res = await sabnzbd_client.set_config("misc", key, value)
-    nzb_options[key] = res["config"]["misc"][key]
-    await update_buttons(pre_message, "nzb")
-    await delete_message(message)
-    await database.update_nzb_config()
-
-
-@new_task
-async def edit_nzb_server(_, message, pre_message, key, index=0):
-    handler_dict[message.chat.id] = False
-    value = str(message.text)
-    if key == "newser":
-        if value.startswith("{") and value.endswith("}"):
-            try:
-                value = eval(value)
-            except:
-                await send_message(message, "Invalid dict format!")
-                await update_buttons(pre_message, "nzbserver")
-                return
-            res = await sabnzbd_client.add_server(value)
-            if not res["config"]["servers"][0]["host"]:
-                await send_message(message, "Invalid server!")
-                await update_buttons(pre_message, "nzbserver")
-                return
-            Config.USENET_SERVERS.append(value)
-            await update_buttons(pre_message, "nzbserver")
-        else:
-            await send_message(message, "Invalid dict format!")
-            await update_buttons(pre_message, "nzbserver")
-            return
-    else:
-        if value.isdigit():
-            value = int(value)
-        res = await sabnzbd_client.add_server(
-            {"name": Config.USENET_SERVERS[index]["name"], key: value}
-        )
-        if res["config"]["servers"][0][key] == "":
-            await send_message(message, "Invalid value")
-            return
-        Config.USENET_SERVERS[index][key] = value
-        await update_buttons(pre_message, f"nzbser{index}")
-    await delete_message(message)
-    await database.update_config({"USENET_SERVERS": Config.USENET_SERVERS})
-
-
-async def sync_jdownloader():
-    async with jd_listener_lock:
-        if not Config.DATABASE_URL or not jdownloader.is_connected:
-            return
-        await jdownloader.device.system.exit_jd()
-    if await aiopath.exists("cfg.zip"):
-        await remove("cfg.zip")
-    await (
-        await create_subprocess_exec(BinConfig.SEVENZ_NAME, "a", "cfg.zip", "/JDownloader/cfg")
-    ).wait()
-    await database.update_private_file("cfg.zip")
 
 
 @new_task
@@ -557,23 +411,7 @@ async def edit_bot_settings(client, query):
         await query.answer()
         globals()["start"] = 0
         await update_buttons(message, None)
-    elif data[1] == "syncjd":
-        if not Config.JD_EMAIL or not Config.JD_PASS:
-            await query.answer(
-                "No Email or Password provided!",
-                show_alert=True,
-            )
-            return
-        await query.answer(
-            "Synchronization Started. JDownloader will get restarted. It takes up to 10 sec!",
-            show_alert=True,
-        )
-        await sync_jdownloader()
-    elif data[1] in ["var", "aria", "qbit", "nzb", "nzbserver"] or data[1].startswith(
-        "nzbser"
-    ):
-        if data[1] == "nzbserver":
-            globals()["start"] = 0
+    elif data[1] in ["var", "aria", "qbit"]:
         await query.answer()
         await update_buttons(message, data[1])
     elif data[1] == "resetvar":
@@ -628,13 +466,8 @@ async def edit_bot_settings(client, query):
         elif data[2] == "INDEX_URL":
             if drives_names and drives_names[0] == "Main":
                 index_urls[0] = ""
-        elif data[2] == "INCOMPLETE_TASK_NOTIFIER":
+        elif data[2] in ("INC_TASK_NOTIFY", "INC_TASK_RESUME"):
             await database.trunc_table("tasks")
-        elif data[2] in ["JD_EMAIL", "JD_PASS"]:
-            await create_subprocess_exec("pkill", "-9", "-f", "java")
-        elif data[2] == "USENET_SERVERS":
-            for s in Config.USENET_SERVERS:
-                await sabnzbd_client.delete_config("servers", s["name"])
         elif data[2] == "AUTHORIZED_CHATS":
             auth_chats.clear()
         elif data[2] == "SUDO_USERS":
@@ -655,19 +488,6 @@ async def edit_bot_settings(client, query):
             "RCLONE_SERVE_PASS",
         ]:
             await rclone_serve_booter()
-    elif data[1] == "resetnzb":
-        await query.answer()
-        res = await sabnzbd_client.set_config_default(data[2])
-        nzb_options[data[2]] = res["config"]["misc"][data[2]]
-        await update_buttons(message, "nzb")
-        await database.update_nzb_config()
-    elif data[1] == "syncnzb":
-        await query.answer(
-            "Synchronization Started. It takes up to 2 sec!", show_alert=True
-        )
-        nzb_options.clear()
-        await update_nzb_options()
-        await database.update_nzb_config()
     elif data[1] == "syncqbit":
         await query.answer(
             "Synchronization Started. It takes up to 2 sec!", show_alert=True
@@ -687,20 +507,6 @@ async def edit_bot_settings(client, query):
         qbit_options[data[2]] = ""
         await update_buttons(message, "qbit")
         await database.update_qbittorrent(data[2], "")
-    elif data[1] == "emptynzb":
-        await query.answer()
-        res = await sabnzbd_client.set_config("misc", data[2], "")
-        nzb_options[data[2]] = res["config"]["misc"][data[2]]
-        await update_buttons(message, "nzb")
-        await database.update_nzb_config()
-    elif data[1] == "remser":
-        index = int(data[2])
-        await sabnzbd_client.delete_config(
-            "servers", Config.USENET_SERVERS[index]["name"]
-        )
-        del Config.USENET_SERVERS[index]
-        await update_buttons(message, "nzbserver")
-        await database.update_config({"USENET_SERVERS": Config.USENET_SERVERS})
     elif data[1] == "private":
         await query.answer()
         await update_buttons(message, data[1])
@@ -749,55 +555,6 @@ async def edit_bot_settings(client, query):
         await event_handler(client, query, pfunc, rfunc)
     elif data[1] == "qbitvar" and state == "view":
         value = f"{qbit_options[data[2]]}"
-        if len(value) > 200:
-            await query.answer()
-            with BytesIO(str.encode(value)) as out_file:
-                out_file.name = f"{data[2]}.txt"
-                await send_file(message, out_file)
-            return
-        elif value == "":
-            value = None
-        await query.answer(f"{value}", show_alert=True)
-    elif data[1] == "nzbvar" and state == "edit":
-        await query.answer()
-        await update_buttons(message, data[2], data[1])
-        pfunc = partial(edit_nzb, pre_message=message, key=data[2])
-        rfunc = partial(update_buttons, message, "nzb")
-        await event_handler(client, query, pfunc, rfunc)
-    elif data[1] == "nzbvar" and state == "view":
-        value = f"{nzb_options[data[2]]}"
-        if len(value) > 200:
-            await query.answer()
-            with BytesIO(str.encode(value)) as out_file:
-                out_file.name = f"{data[2]}.txt"
-                await send_file(message, out_file)
-            return
-        elif value == "":
-            value = None
-        await query.answer(f"{value}", show_alert=True)
-    elif data[1] == "emptyserkey":
-        await query.answer()
-        await update_buttons(message, f"nzbser{data[2]}")
-        index = int(data[2])
-        res = await sabnzbd_client.add_server(
-            {"name": Config.USENET_SERVERS[index]["name"], data[3]: ""}
-        )
-        Config.USENET_SERVERS[index][data[3]] = res["config"]["servers"][0][data[3]]
-        await database.update_config({"USENET_SERVERS": Config.USENET_SERVERS})
-    elif data[1].startswith("nzbsevar") and (state == "edit" or data[2] == "newser"):
-        index = 0 if data[2] == "newser" else int(data[1].replace("nzbsevar", ""))
-        await query.answer()
-        await update_buttons(message, data[2], data[1])
-        pfunc = partial(edit_nzb_server, pre_message=message, key=data[2], index=index)
-        rfunc = partial(
-            update_buttons,
-            message,
-            f"nzbser{index}" if data[2] != "newser" else "nzbserver",
-        )
-        await event_handler(client, query, pfunc, rfunc)
-    elif data[1].startswith("nzbsevar") and state == "view":
-        index = int(data[1].replace("nzbsevar", ""))
-        value = f"{Config.USENET_SERVERS[index][data[2]]}"
         if len(value) > 200:
             await query.answer()
             with BytesIO(str.encode(value)) as out_file:
@@ -874,7 +631,7 @@ async def load_config():
         )
         await database.update_aria2("bt-stop-timeout", f"{Config.TORRENT_TIMEOUT}")
 
-    if not Config.INCOMPLETE_TASK_NOTIFIER:
+    if not (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME):
         await database.trunc_table("tasks")
 
     await (await create_subprocess_exec("pkill", "-9", "-f", "gunicorn")).wait()

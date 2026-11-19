@@ -52,13 +52,18 @@ async def stop_duplicate_check(listener):
 
 
 async def check_running_tasks(listener, state="dl"):
+    if state == "dl" and listener.mid in non_queued_dl:
+        return False, None
+    if state == "up" and listener.mid in non_queued_up:
+        return False, None
     all_limit = Config.QUEUE_ALL
     state_limit = Config.QUEUE_DOWNLOAD if state == "dl" else Config.QUEUE_UPLOAD
     event = None
     is_over_limit = False
     async with queue_dict_lock:
         if state == "up" and listener.mid in non_queued_dl:
-            non_queued_dl.remove(listener.mid)
+            if not getattr(listener, "batch_mode", False):
+                non_queued_dl.remove(listener.mid)
         if (
             (all_limit or state_limit)
             and not listener.force_run
@@ -66,6 +71,12 @@ async def check_running_tasks(listener, state="dl"):
             and not (listener.force_download and state == "dl")
         ):
             dl_count = len(non_queued_dl)
+            if (
+                state == "up"
+                and getattr(listener, "batch_mode", False)
+                and listener.mid in non_queued_dl
+            ):
+                dl_count -= 1
             up_count = len(non_queued_up)
             t_count = dl_count if state == "dl" else up_count
             is_over_limit = (

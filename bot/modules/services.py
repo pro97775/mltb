@@ -1,5 +1,6 @@
 from time import time
 
+from ..core.config_manager import Config
 from ..helper.ext_utils.bot_utils import new_task
 from ..helper.telegram_helper.button_build import ButtonMaker
 from ..helper.telegram_helper.message_utils import send_message, edit_message, send_file
@@ -17,14 +18,20 @@ async def start(_, message):
     reply_markup = buttons.build_menu(2)
     if await CustomFilters.authorized(_, message):
         start_string = f"""
-This bot can mirror from links|tgfiles|torrents|nzb|rclone-cloud to any rclone cloud, Google Drive or to telegram.
+This bot can mirror from links|tgfiles|torrents|rclone-cloud to any rclone cloud, Google Drive or to telegram.
 Type /{BotCommands.HelpCommand} to get a list of available commands
 """
         await send_message(message, start_string, reply_markup)
+    elif Config.BOT_PM:
+        await send_message(
+            message,
+            "<i>Now, Bot will send you all your files and links here. Start Using Now...</i>",
+            reply_markup,
+        )
     else:
         await send_message(
             message,
-            "This bot can mirror from links|tgfiles|torrents|nzb|rclone-cloud to any rclone cloud, Google Drive or to telegram.\n\n⚠️ You Are not authorized user! Deploy your own mirror-leech bot",
+            "This bot can mirror from links|tgfiles|torrents|rclone-cloud to any rclone cloud, Google Drive or to telegram.\n\n⚠ You Are not authorized user! Deploy your own mirror-leech bot",
             reply_markup,
         )
 

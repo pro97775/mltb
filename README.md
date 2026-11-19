@@ -11,7 +11,7 @@ A fully hardened, container-ready build of the asynchronous cloud task worker an
 - Replaced hardcoded `"ffprobe"` calls in `get_media_info` and `get_document_type` (`bot/helper/ext_utils/media_utils.py`) with `BinConfig.FFPROBE_NAME` (`mediaprobe`).
 - Created `/opt/media-tools` symlink directory in `Dockerfile` and `base-image/Dockerfile` (`/opt/media-tools/ffmpeg -> /usr/bin/mediaforge`, `/opt/media-tools/ffprobe -> /usr/bin/mediaprobe`) and pointed `yt_dlp_download.py` `ffmpeg_location` to `/opt/media-tools` so `yt-dlp`'s `FFmpegPostProcessor` properly locates both binaries during audio extraction and thumbnail embedding.
 
-### 2. Complete 7-Binary Alias System (`BinConfig` & `Dockerfile`s)
+### 2. Complete 6-Binary Alias System (`BinConfig` & `Dockerfile`s)
 All underlying worker binaries are renamed at container build time and referenced dynamically via `BinConfig` (with environment variable override support):
 
 | Original Binary | New Binary Alias | Env Variable Override | Patched Modules |
@@ -21,11 +21,10 @@ All underlying worker binaries are renamed at container build time and reference
 | `ffmpeg` | `mediaforge` | `FFMPEG_NAME` | `common.py`, `media_utils.py`, `tldv_downloader.py`, `yt_dlp_download.py`, `restart.py`, `stats.py` |
 | `ffprobe` | `mediaprobe` | `FFPROBE_NAME` | `media_utils.py`, `restart.py`, `/opt/media-tools` |
 | `rclone` | `ghostdrive` | `RCLONE_NAME` | `rclone_download.py`, `list.py`, `serve.py`, `transfer.py`, `clone.py`, `restart.py`, `stats.py` |
-| `sabnzbdplus` | `newsripper` | `SABNZBD_NAME` | `services.sh`, `startup.py`, `restart.py`, `stats.py` |
 | `7z` | `archiver7` | `SEVENZ_NAME` | `files_utils.py`, `startup.py`, `bot_settings.py`, `restart.py`, `stats.py` |
 
 ### 3. Hidden Daemon Configuration (`services.sh` + `.svc_rpc.conf`)
-- Removed `aria-nox-nzb.sh` and replaced it with `services.sh`.
+- Replaced the legacy daemon script with `services.sh`.
 - Instead of passing 25+ explicit BitTorrent and tracker CLI flags on the command line (which exposes `--bt-tracker`, `--peer-id-prefix`, and `--peer-agent` in `ps aux` and `/proc/<pid>/cmdline`), `services.sh` writes all RPC and transfer settings into a `0600` `.svc_rpc.conf` file and launches:
   ```bash
   blitzfetcher --conf-path=.svc_rpc.conf --daemon=true
@@ -39,7 +38,7 @@ All underlying worker binaries are renamed at container build time and reference
 ### 5. Sanitized `update.py`, Virtual Environment, and Default Credentials
 - Renamed Python virtual environment from `mltbenv` to `appenv` across `Dockerfile`, `.dockerignore`, and `start.sh`.
 - Updated `update.py` to block accidental `git reset --hard` against `anasty17/mirror-leech-telegram-bot` (which would otherwise overwrite all patched bypass files on container boot) and replaced the default git commit identity.
-- Changed default credentials and API keys in `qBittorrent/config/qBittorrent.conf`, `sabnzbd/SABnzbd.ini`, `bot/__init__.py`, `bot/core/startup.py`, and `web/wserver.py` (`admin` / `cloudsync2026` / `svc_key_8070`).
+- Changed default credentials and API keys in `qBittorrent/config/qBittorrent.conf`, `bot/__init__.py`, `bot/core/startup.py`, and `web/wserver.py` (`admin` / `cloudsync2026`).
 - Cleared public torrent scraper URLs from `config_sample.py` and removed `.github/FUNDING.yml`.
 
 ---
@@ -149,4 +148,4 @@ To prevent container registries from fingerprinting `FROM anasty17/mltb:latest`,
 
 1. **Never set `UPSTREAM_REPO` to the public stock repository**: Leave `UPSTREAM_REPO` empty or point it only to your own **private** GitHub repository containing these patches.
 2. **Use a Private GitHub Repository**: Public forks of known mirror/leech repositories are automatically indexed. Always host your code in a private repo.
-3. **Avoid Raw Public BitTorrent Traffic on Heroku**: Heroku monitors outbound BitTorrent DHT/peer traffic at the network layer. On Heroku dynos, use direct links, Google Drive, Rclone, Usenet (`SABnzbd`), or Debrid resolvers (`ALLDEBRID_API_KEY` / TorBox) rather than unproxied P2P BitTorrent swarms.
+3. **Avoid Raw Public BitTorrent Traffic on Heroku**: Heroku monitors outbound BitTorrent DHT/peer traffic at the network layer. On Heroku dynos, use direct links, Google Drive, Rclone, or Debrid resolvers (`ALLDEBRID_API_KEY` / TorBox) rather than unproxied P2P BitTorrent swarms.

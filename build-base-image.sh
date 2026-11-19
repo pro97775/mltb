@@ -15,7 +15,6 @@ QBIT_NAME="${QBIT_NAME:-stormtorrent}"
 FFMPEG_NAME="${FFMPEG_NAME:-mediaforge}"
 FFPROBE_NAME="${FFPROBE_NAME:-mediaprobe}"
 RCLONE_NAME="${RCLONE_NAME:-ghostdrive}"
-SABNZBD_NAME="${SABNZBD_NAME:-newsripper}"
 SEVENZ_NAME="${SEVENZ_NAME:-archiver7}"
 
 echo "============================================================"
@@ -26,7 +25,6 @@ echo " QBIT_NAME    = $QBIT_NAME"
 echo " FFMPEG_NAME  = $FFMPEG_NAME"
 echo " FFPROBE_NAME = $FFPROBE_NAME"
 echo " RCLONE_NAME  = $RCLONE_NAME"
-echo " SABNZBD_NAME = $SABNZBD_NAME"
 echo " SEVENZ_NAME  = $SEVENZ_NAME"
 echo "============================================================"
 
@@ -37,7 +35,6 @@ docker build \
   --build-arg FFMPEG_NAME="$FFMPEG_NAME" \
   --build-arg FFPROBE_NAME="$FFPROBE_NAME" \
   --build-arg RCLONE_NAME="$RCLONE_NAME" \
-  --build-arg SABNZBD_NAME="$SABNZBD_NAME" \
   --build-arg SEVENZ_NAME="$SEVENZ_NAME" \
   -t "$IMAGE_TAG" .
 

@@ -6,6 +6,7 @@ apscheduler
 aioaria2
 aioqbt
 cloudscraper
+curl_cffi
 dnspython
 fastapi
 feedparser
@@ -17,7 +18,6 @@ httpx
 jinja2
 lxml
 natsort
-par2cmdline-turbo
 pillow
 psutil
 pymongo

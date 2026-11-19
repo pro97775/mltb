@@ -1,14 +1,13 @@
 from aiofiles.os import path as aiopath, remove, makedirs
 from aiofiles import open as aiopen
 from aioshutil import rmtree
-from asyncio import create_subprocess_exec, create_subprocess_shell, sleep
+from asyncio import create_subprocess_exec, create_subprocess_shell
 from importlib import import_module
 from os import getenv
 
 from .. import (
     aria2_options,
     qbit_options,
-    nzb_options,
     drives_ids,
     drives_names,
     index_urls,
@@ -17,7 +16,6 @@ from .. import (
     included_extensions,
     LOGGER,
     rss_dict,
-    sabnzbd_client,
     auth_chats,
     sudo_users,
 )
@@ -63,18 +61,6 @@ async def update_aria2_options():
         aria2_options.update(op)
     else:
         await TorrentManager.aria2.changeGlobalOption(aria2_options)
-
-
-async def update_nzb_options():
-    LOGGER.info("Get SABnzbd options from server")
-    while True:
-        try:
-            no = (await sabnzbd_client.get_config())["config"]["misc"]
-            nzb_options.update(no)
-        except:
-            await sleep(0.5)
-            continue
-        break
 
 
 async def load_settings():
@@ -140,14 +126,6 @@ async def load_settings():
         qbit_options.update(qbit_opt)
         _force_recheck_off(qbit_options)
 
-    if nzb_opt := await database.db.settings.nzb.find_one({"_id": BOT_ID}, {"_id": 0}):
-        if await aiopath.exists("sabnzbd/SABnzbd.ini.bak"):
-            await remove("sabnzbd/SABnzbd.ini.bak")
-        ((key, value),) = nzb_opt.items()
-        file_ = key.replace("__", ".")
-        async with aiopen(f"sabnzbd/{file_}", "wb+") as f:
-            await f.write(value)
-
     if await database.db.users.find_one():
         for p in ["thumbnails", "tokens", "rclone"]:
             if not await aiopath.exists(p):
@@ -196,12 +174,6 @@ async def save_settings():
         )
     if await database.db.settings.qbittorrent.find_one({"_id": TgClient.ID}) is None:
         await database.save_qbit_settings()
-    if await database.db.settings.nzb.find_one({"_id": TgClient.ID}) is None:
-        async with aiopen("sabnzbd/SABnzbd.ini", "rb+") as pf:
-            nzb_conf = await pf.read()
-        await database.db.settings.nzb.update_one(
-            {"_id": TgClient.ID}, {"$set": {"SABnzbd__ini": nzb_conf}}, upsert=True
-        )
 
 
 async def update_variables():
@@ -268,7 +240,7 @@ async def load_configurations():
 
     await (
         await create_subprocess_shell(
-            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x services.sh && ./services.sh {BinConfig.ARIA2_NAME} {BinConfig.QBIT_NAME} {BinConfig.SABNZBD_NAME}"
+            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x services.sh && ./services.sh {BinConfig.ARIA2_NAME} {BinConfig.QBIT_NAME}"
         )
     ).wait()
 
@@ -277,13 +249,6 @@ async def load_configurations():
         await create_subprocess_shell(
             f"gunicorn -k uvicorn.workers.UvicornWorker -w 1 web.wserver:app --bind 0.0.0.0:{web_port}"
         )
-
-    if await aiopath.exists("cfg.zip"):
-        if await aiopath.exists("/JDownloader/cfg"):
-            await rmtree("/JDownloader/cfg", ignore_errors=True)
-        await (
-            await create_subprocess_exec(BinConfig.SEVENZ_NAME, "x", "cfg.zip", "-o/JDownloader")
-        ).wait()
 
     if await aiopath.exists("accounts.zip"):
         if await aiopath.exists("accounts"):

@@ -12,7 +12,6 @@ async def main():
         load_configurations,
         save_settings,
         update_aria2_options,
-        update_nzb_options,
         update_qb_options,
         update_variables,
     )
@@ -28,25 +27,20 @@ async def main():
     await gather(
         update_qb_options(),
         update_aria2_options(),
-        update_nzb_options(),
     )
     from .helper.ext_utils.files_utils import clean_all
-    from .core.jdownloader_booter import jdownloader
     from .helper.ext_utils.telegraph_helper import telegraph
     from .helper.mirror_leech_utils.rclone_utils.serve import rclone_serve_booter
     from .modules import (
         initiate_search_tools,
         get_packages_version,
-        restart_notification,
     )
 
     await gather(
         save_settings(),
-        jdownloader.boot(),
         clean_all(),
         initiate_search_tools(),
         get_packages_version(),
-        restart_notification(),
         telegraph.create_account(),
         rclone_serve_booter(),
     )
@@ -61,6 +55,10 @@ from .core.handlers import add_handlers
 add_aria2_callbacks()
 create_help_buttons()
 add_handlers()
+
+from .modules import restart_notification
+
+bot_loop.run_until_complete(restart_notification())
 
 LOGGER.info(f"Bot Started! @{TgClient.NAME}")
 bot_loop.run_forever()

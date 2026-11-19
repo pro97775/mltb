@@ -21,7 +21,6 @@ RUN rename_bin() { \
     rename_bin ffmpeg mediaforge "mediaforge" && \
     rename_bin ffprobe mediaprobe "mediaprobe" && \
     rename_bin rclone ghostdrive "ghostdrive" && \
-    rename_bin sabnzbdplus newsripper "newsripper" && \
     rename_bin 7z archiver7 "archiver7" && \
     mkdir -p /opt/media-tools && \
     ln -sf /usr/bin/mediaforge /opt/media-tools/ffmpeg && \

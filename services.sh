@@ -1,7 +1,6 @@
 #!/bin/bash
 ARIA2C=${1:-blitzfetcher}
 QBIT=${2:-stormtorrent}
-SABNZBDPLUS=${3:-newsripper}
 
 tracker_list=$(curl -Ns https://ngosang.github.io/trackerslist/trackers_all_http.txt | awk '$0' | tr '\n\n' ',')
 
@@ -43,4 +42,3 @@ CONF
 chmod 600 .svc_rpc.conf
 $ARIA2C --conf-path=.svc_rpc.conf --daemon=true
 $QBIT -d --profile="$(pwd)"
-$SABNZBDPLUS -f sabnzbd/SABnzbd.ini -s :::8070 -b 0 -d -c -l 0 --console

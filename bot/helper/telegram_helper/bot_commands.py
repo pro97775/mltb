@@ -6,16 +6,12 @@ class BotCommands:
     StartCommand = f"start{i}"
     MirrorCommand = [f"mirror{i}", f"m{i}"]
     QbMirrorCommand = [f"qbmirror{i}", f"qm{i}"]
-    JdMirrorCommand = [f"jdmirror{i}", f"jm{i}"]
     YtdlCommand = [f"ytdl{i}", f"y{i}"]
     GallerydlCommand = [f"gallerydl{i}", f"gdl{i}"]
-    NzbMirrorCommand = [f"nzbmirror{i}", f"nm{i}"]
     LeechCommand = [f"leech{i}", f"l{i}"]
     QbLeechCommand = [f"qbleech{i}", f"ql{i}"]
-    JdLeechCommand = [f"jdleech{i}", f"jl{i}"]
     YtdlLeechCommand = [f"ytdlleech{i}", f"yl{i}"]
     GallerydlLeechCommand = [f"gallerydlleech{i}", f"gdlleech{i}"]
-    NzbLeechCommand = [f"nzbleech{i}", f"nl{i}"]
     CloneCommand = f"clone{i}"
     CountCommand = f"count{i}"
     DeleteCommand = f"del{i}"
@@ -43,4 +39,3 @@ class BotCommands:
     UserSetCommand = [f"usetting{i}", f"us{i}"]
     SelectCommand = f"sel{i}"
     RssCommand = f"rss{i}"
-    NzbSearchCommand = f"nzbsearch{i}"

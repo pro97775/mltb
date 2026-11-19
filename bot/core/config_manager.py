@@ -14,6 +14,7 @@ class Config:
     BASE_URL_PORT = int(getenv("PORT", "80"))
     BATCH_MAX_SIZE = 0
     BOT_TOKEN = ""
+    BOT_PM = False
     BUZZHEAVIER_ACCOUNT_ID = ""
     BUZZHEAVIER_FOLDER_ID = ""
     GOFILE_API_KEY = ""
@@ -32,18 +33,16 @@ class Config:
     FILES_LINKS = False
     GALLERY_DL_OPTIONS = {}
     GDRIVE_ID = ""
-    INCOMPLETE_TASK_NOTIFIER = False
+    INC_TASK_NOTIFY = False
+    INC_TASK_RESUME = False
     INDEX_URL = ""
+    INSTADL_API = ""
     IS_TEAM_DRIVE = False
-    JD_EMAIL = ""
-    JD_PASS = ""
     LEECH_DUMP_CHAT = ""
     LEECH_FILENAME_PREFIX = ""
     LEECH_SPLIT_SIZE = 2097152000
     MEDIA_GROUP = False
     HYBRID_LEECH = False
-    HYDRA_IP = ""
-    HYDRA_API_KEY = ""
     NAME_SUBSTITUTE = r""
     OWNER_ID = 0
     QUEUE_ALL = 0
@@ -76,7 +75,6 @@ class Config:
     UPLOAD_PATHS = {}
     UPSTREAM_REPO = ""
     UPSTREAM_BRANCH = "master"
-    USENET_SERVERS = []
     USER_SESSION_STRING = ""
     USER_TRANSMISSION = False
     USE_SERVICE_ACCOUNTS = False
@@ -153,10 +151,6 @@ class Config:
             "SEARCH_API_LINK",
         }:
             return converted_value.strip("/") if converted_value else ""
-        if attr == "USENET_SERVERS" and (
-            not converted_value or not converted_value[0].get("host")
-        ):
-            return []
         return converted_value
 
     @classmethod
@@ -225,5 +219,4 @@ class BinConfig:
     FFMPEG_NAME = getenv("FFMPEG_NAME", "mediaforge")
     FFPROBE_NAME = getenv("FFPROBE_NAME", "mediaprobe")
     RCLONE_NAME = getenv("RCLONE_NAME", "ghostdrive")
-    SABNZBD_NAME = getenv("SABNZBD_NAME", "newsripper")
     SEVENZ_NAME = getenv("SEVENZ_NAME", "archiver7")

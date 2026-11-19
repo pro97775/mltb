@@ -231,11 +231,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
         if (
             task.tool == "aria2"
             and task.listener.is_torrent
-            or task.tool
-            in [
-                "qbittorrent",
-                "sabnzbd",
-            ]
+            or task.tool == "qbittorrent"
         ) and tstatus in [
             MirrorStatus.STATUS_DOWNLOAD,
             MirrorStatus.STATUS_PAUSED,
