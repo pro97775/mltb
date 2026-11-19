@@ -502,10 +502,56 @@ def hubdrive(url):
 
 def gdflix(url):
     with CurlSession(impersonate="chrome") as session:
-        res = session.get(url)
+        def via_reader(target, links_summary=False):
+            try:
+                res = session.get(
+                    f"https://r.jina.ai/{target}",
+                    headers=(
+                        {"X-With-Links-Summary": "true"}
+                        if links_summary
+                        else {"X-Return-Format": "html"}
+                    ),
+                    timeout=90,
+                )
+                if res.status_code == 200 and len(res.text) > 500:
+                    return res
+            except Exception:
+                pass
+            return None
+
+        def instant_links(tree, text):
+            links = tree.xpath(
+                "//a[contains(@href, 'instant') or contains(@href, 'instadl') "
+                "or contains(translate(normalize-space(.), "
+                "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+                "'instant dl')]/@href"
+            )
+            if not links:
+                links = [
+                    href
+                    for href in tree.xpath("//@href")
+                    if "instadl" in href.lower() or "instant" in href.lower()
+                ]
+            if not links and (
+                marker := search(
+                    r'https?://[^"\'\s<>]*(?:instadl|instant)[^"\'\s<>]*',
+                    text,
+                    I,
+                )
+            ):
+                links = [marker.group(0)]
+            return links
+
+        res = session.get(url, timeout=40)
+        proxied = False
+        if res.status_code != 200:
+            if reader := via_reader(url):
+                res = reader
+                proxied = True
         tree = HTML(res.text)
         if "/pack/" in url:
-            host = f"https://{urlparse(res.url).netloc}"
+            base = (tree.xpath("//meta[@property='og:url']/@content") or [""])[0]
+            host = f"https://{urlparse(base or url).netloc}"
             details = {
                 "contents": [],
                 "title": (tree.xpath("//title/text()") or [""])[0]
@@ -526,36 +572,36 @@ def gdflix(url):
             if not details["contents"]:
                 raise DirectDownloadLinkException("ERROR: No files found in pack")
             return details
-        instant = tree.xpath(
-            "//a[contains(@href, 'instant') or contains(@href, 'instadl') "
-            "or contains(translate(normalize-space(.), "
-            "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
-            "'instant dl')]/@href"
-        )
-        if not instant:
-            instant = [
-                href
-                for href in tree.xpath("//@href")
-                if "instadl" in href.lower() or "instant" in href.lower()
-            ]
-        if not instant and (
-            marker := search(
-                r'https?://[^"\'\s<>]*(?:instadl|instant)[^"\'\s<>]*',
-                res.text,
-                I,
-            )
-        ):
-            instant = [marker.group(0)]
+        instant = instant_links(tree, res.text)
+        if not instant and not proxied:
+            if reader := via_reader(url):
+                res = reader
+                tree = HTML(res.text)
+                instant = instant_links(tree, res.text)
         if not instant:
             raise DirectDownloadLinkException(
                 "ERROR: Instant DL link not found "
-                f"(status={res.status_code}, url={res.url}, "
+                f"(status={res.status_code}, url={url}, "
                 f"len={len(res.text)}, "
                 f"instadl_marker={'instadl' in res.text.lower()})"
             )
-        res = session.get(instant[0], allow_redirects=False)
-        if not (loc := res.headers.get("location", "").strip()):
-            raise DirectDownloadLinkException("ERROR: File Not Found or Expired")
+        res = session.get(instant[0], allow_redirects=False, timeout=40)
+        loc = res.headers.get("location", "").strip()
+        if not loc:
+            if reader := via_reader(instant[0], links_summary=True):
+                if match_ := search(r"Final URL:\s*(\S+)", reader.text):
+                    loc = match_.group(1)
+                elif match_ := search(r"https://fastdl[^\s)\]]+", reader.text):
+                    loc = match_.group(1)
+                elif match_ := search(
+                    r"https://video-downloads\.googleusercontent\.com/[^\s)\]]+",
+                    reader.text,
+                ):
+                    loc = match_.group(1)
+        if not loc:
+            raise DirectDownloadLinkException(
+                f"ERROR: File Not Found or Expired (status={res.status_code})"
+            )
         if durl := parse_qs(urlparse(loc).query).get("url"):
             return durl[0]
         return loc
