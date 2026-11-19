@@ -526,7 +526,14 @@ def gdflix(url):
             if not details["contents"]:
                 raise DirectDownloadLinkException("ERROR: No files found in pack")
             return details
-        if not (instant := tree.xpath("//a[contains(@href, 'instant')]/@href")):
+        if not (
+            instant := tree.xpath(
+                "//a[contains(@href, 'instant') or contains(@href, 'instadl') "
+                "or contains(translate(normalize-space(.), "
+                "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+                "'instant dl')]/@href"
+            )
+        ):
             raise DirectDownloadLinkException("ERROR: Instant DL link not found")
         res = session.get(instant[0], allow_redirects=False)
         if not (loc := res.headers.get("location", "").strip()):
