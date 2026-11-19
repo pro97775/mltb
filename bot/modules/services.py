@@ -1,5 +1,6 @@
 from time import time
 
+from ..core.config_manager import Config
 from ..helper.ext_utils.bot_utils import new_task
 from ..helper.telegram_helper.button_build import ButtonMaker
 from ..helper.telegram_helper.message_utils import send_message, edit_message, send_file
@@ -21,6 +22,12 @@ This bot can mirror from links|tgfiles|torrents|nzb|rclone-cloud to any rclone c
 Type /{BotCommands.HelpCommand} to get a list of available commands
 """
         await send_message(message, start_string, reply_markup)
+    elif Config.BOT_PM:
+        await send_message(
+            message,
+            "<i>Now, Bot will send you all your files and links here. Start Using Now...</i>",
+            reply_markup,
+        )
     else:
         await send_message(
             message,

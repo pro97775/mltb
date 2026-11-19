@@ -77,6 +77,7 @@ class TaskConfig:
         self.up_dir = ""
         self.link = ""
         self.up_dest = ""
+        self.leech_dest = ""
         self.rc_flags = ""
         self.tag = ""
         self.name = ""
@@ -138,6 +139,8 @@ class TaskConfig:
         self.as_doc = False
         self.is_file = False
         self.bot_trans = False
+        self.bot_pm = Config.BOT_PM or self.user_dict.get("BOT_PM")
+        self.pm_msg = None
         self.user_trans = False
         self.is_rss = getattr(self.message, "_rss_trigger", False)
         self.progress = True
@@ -432,15 +435,8 @@ class TaskConfig:
                 ) != self.get_config_path(self.up_dest):
                     raise ValueError("You must use the same config to clone!")
         elif not self.is_buzzheavier and not self.is_gofile:
-            self.up_dest = (
-                self.up_dest
-                or self.user_dict.get("LEECH_DUMP_CHAT")
-                or (
-                    Config.LEECH_DUMP_CHAT
-                    if "LEECH_DUMP_CHAT" not in self.user_dict
-                    else None
-                )
-            )
+            self.leech_dest = self.up_dest or self.user_dict.get("LEECH_DUMP_CHAT")
+            self.up_dest = Config.LEECH_DUMP_CHAT
             self.hybrid_leech = TgClient.IS_PREMIUM_USER and (
                 self.user_dict.get("HYBRID_LEECH")
                 or Config.HYBRID_LEECH

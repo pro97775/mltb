@@ -14,6 +14,7 @@ class Config:
     BASE_URL_PORT = int(getenv("PORT", "80"))
     BATCH_MAX_SIZE = 0
     BOT_TOKEN = ""
+    BOT_PM = False
     BUZZHEAVIER_ACCOUNT_ID = ""
     BUZZHEAVIER_FOLDER_ID = ""
     GOFILE_API_KEY = ""

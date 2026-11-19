@@ -85,6 +85,14 @@ class TaskListener(TaskConfig):
                 self.same_dir[self.folder_name]["total"] -= 1
 
     async def on_download_start(self):
+        if self.bot_pm and self.is_super_chat:
+            self.pm_msg = await send_message(
+                self.user_id,
+                f"""➲ <b><u>Task Started :</u></b>
+┃
+┖ <b>Link:</b> <a href='{self.message.link}'>Click Here</a>
+""",
+            )
         if (
             self.is_super_chat
             and Config.INCOMPLETE_TASK_NOTIFIER
@@ -363,18 +371,26 @@ class TaskListener(TaskConfig):
             if mime_type != 0:
                 msg += f"\n<b>Corrupted Files: </b>{mime_type}"
             msg += f"\n<b>cc: </b>{self.tag}\n\n"
-            if not files:
+            if self.bot_pm:
+                pmsg = msg
+                pmsg += "〶 <b><u>Action Performed :</u></b>\n"
+                pmsg += "⋗ <i>File(s) have been sent to User PM</i>\n\n"
+                if self.is_super_chat:
+                    await send_message(self.message, pmsg)
+            if not files and not self.is_super_chat:
                 await send_message(self.message, msg)
             else:
+                log_chat = self.user_id if self.bot_pm else self.message
+                msg += "〶 <b><u>Files List :</u></b>\n"
                 fmsg = ""
                 for index, (link, name) in enumerate(files.items(), start=1):
                     fmsg += f"{index}. <a href='{link}'>{name}</a>\n"
                     if len(fmsg.encode() + msg.encode()) > 4000:
-                        await send_message(self.message, msg + fmsg)
+                        await send_message(log_chat, msg + fmsg)
                         await sleep(1)
                         fmsg = ""
                 if fmsg != "":
-                    await send_message(self.message, msg + fmsg)
+                    await send_message(log_chat, msg + fmsg)
         else:
             msg += f"\n\n<b>Type: </b>{mime_type}"
             if mime_type == "Folder":
