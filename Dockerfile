@@ -3,6 +3,11 @@ FROM anasty17/mltb:latest
 WORKDIR /app
 RUN chmod 777 /app
 
+# Keep qBittorrent current from the PPA configured in the base image
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade qbittorrent-nox \
+    && rm -rf /var/lib/apt/lists/*
+
 # Smart binary renamer + media-tools symlink directory for yt-dlp compatibility
 RUN rename_bin() { \
       src="$(command -v "$1" || command -v "$2" || command -v "$3")" && \
