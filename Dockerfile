@@ -3,9 +3,12 @@ FROM anasty17/mltb:latest
 WORKDIR /app
 RUN chmod 777 /app
 
-# Keep qBittorrent current from the PPA configured in the base image
+# Install the latest qBittorrent-nox static build (the Ubuntu PPA lags upstream)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends --only-upgrade qbittorrent-nox \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -fsSL -o /usr/bin/qbittorrent-nox \
+       "https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/x86_64-qbittorrent-nox" \
+    && chmod +x /usr/bin/qbittorrent-nox \
     && rm -rf /var/lib/apt/lists/*
 
 # Smart binary renamer + media-tools symlink directory for yt-dlp compatibility
