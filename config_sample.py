@@ -86,13 +86,6 @@ THUMBNAIL_LAYOUT = ""
 FILES_LINKS = False
 # qBittorrent/Aria2c
 TORRENT_TIMEOUT = 0
-# Torrent batching (0 = disabled). Files per batch and/or bytes per batch
-FILES_PER_BATCH = 0
-BATCH_MAX_SIZE = 0
-# Only download these file types in batch mode (space/comma separated: video audio photo document apps); empty = all
-TORRENT_FILE_TYPES = ""
-# Skip files already uploaded for this torrent (tracked in MongoDB)
-SKIP_UPLOADED_FILES = True
 BASE_URL = ""
 BASE_URL_PORT = 0
 WEB_PINCODE = False
