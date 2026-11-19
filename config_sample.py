@@ -24,7 +24,6 @@ GOFILE_API_KEY = ""
 TLDV_TOKEN = ""
 EXCLUDED_EXTENSIONS = ""
 INCLUDED_EXTENSIONS = ""
-INCOMPLETE_TASK_NOTIFIER = False
 # Notify about incomplete tasks after restart / auto-resume them
 INC_TASK_NOTIFY = False
 INC_TASK_RESUME = False

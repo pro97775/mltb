@@ -33,7 +33,6 @@ class Config:
     FILES_LINKS = False
     GALLERY_DL_OPTIONS = {}
     GDRIVE_ID = ""
-    INCOMPLETE_TASK_NOTIFIER = False
     INC_TASK_NOTIFY = False
     INC_TASK_RESUME = False
     INDEX_URL = ""

@@ -60,15 +60,11 @@ async def restart_notification():
 
     now = datetime.now()
 
-    if Config.DATABASE_URL and (
-        Config.INC_TASK_NOTIFY
-        or Config.INC_TASK_RESUME
-        or Config.INCOMPLETE_TASK_NOTIFIER
-    ):
+    if Config.DATABASE_URL and (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME):
         if notifier_dict := await database.get_incomplete_tasks():
             if Config.INC_TASK_RESUME:
                 await _resume_tasks(notifier_dict)
-            if Config.INC_TASK_NOTIFY or Config.INCOMPLETE_TASK_NOTIFIER:
+            if Config.INC_TASK_NOTIFY:
                 await _notify_tasks(notifier_dict, chat_id, now)
             if not Config.INC_TASK_RESUME:
                 await database.trunc_table("tasks")

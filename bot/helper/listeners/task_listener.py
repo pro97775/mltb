@@ -93,11 +93,7 @@ class TaskListener(TaskConfig):
 ┖ <b>Link:</b> <a href='{self.message.link}'>Click Here</a>
 """,
             )
-        if (
-            Config.INC_TASK_NOTIFY
-            or Config.INC_TASK_RESUME
-            or Config.INCOMPLETE_TASK_NOTIFIER
-        ) and Config.DATABASE_URL:
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
             command = self.message.text or self.message.caption or ""
             if self.message.reply_to_message:
                 reply_to_msg_id = self.message.reply_to_message.id
@@ -383,11 +379,7 @@ class TaskListener(TaskConfig):
     async def on_upload_complete(
         self, link, files, folders, mime_type, rclone_path="", dir_id=""
     ):
-        if (
-            Config.INC_TASK_NOTIFY
-            or Config.INC_TASK_RESUME
-            or Config.INCOMPLETE_TASK_NOTIFIER
-        ) and Config.DATABASE_URL:
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
             await database.rm_complete_task(self.get_task_link())
         msg = f"<b>Name: </b><code>{escape(self.name)}</code>\n\n<b>Size: </b>{get_readable_file_size(self.size)}"
         LOGGER.info(f"Task Done: {self.name}")
@@ -529,11 +521,7 @@ class TaskListener(TaskConfig):
         else:
             await update_status_message(self.message.chat.id)
 
-        if (
-            Config.INC_TASK_NOTIFY
-            or Config.INC_TASK_RESUME
-            or Config.INCOMPLETE_TASK_NOTIFIER
-        ) and Config.DATABASE_URL:
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
             await database.rm_complete_task(self.get_task_link())
 
         async with queue_dict_lock:
@@ -567,11 +555,7 @@ class TaskListener(TaskConfig):
         else:
             await update_status_message(self.message.chat.id)
 
-        if (
-            Config.INC_TASK_NOTIFY
-            or Config.INC_TASK_RESUME
-            or Config.INCOMPLETE_TASK_NOTIFIER
-        ) and Config.DATABASE_URL:
+        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
             await database.rm_complete_task(self.get_task_link())
 
         async with queue_dict_lock:
