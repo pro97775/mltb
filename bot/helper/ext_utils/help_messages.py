@@ -432,9 +432,6 @@ PASSWORD_ERROR_MESSAGE = """
 
 user_settings_text = {
     "LEECH_SPLIT_SIZE": f"Send Leech split size in bytes or use gb or mb. Example: 40000000 or 2.5gb or 1000mb. IS_PREMIUM_USER: {TgClient.IS_PREMIUM_USER}. Timeout: 60 sec",
-    "FILES_PER_BATCH": "Send how many torrent files to download at a time. Example: 1 or 3. Send 0 to download the whole torrent at once. Timeout: 60 sec",
-    "BATCH_MAX_SIZE": "Send the maximum size of one download batch in bytes or use gb or mb. Example: 2gb or 800mb. Send 0 for no size cap. Timeout: 60 sec",
-    "TORRENT_FILE_TYPES": "Send the file types to download separated by space: video audio photo document apps. Example: video apps. Timeout: 60 sec",
     "LEECH_DUMP_CHAT": """Send leech destination ID/USERNAME/PM.
 * b:id/@username/pm (b: means leech by bot) (id or username of the chat or write pm means private message so bot will send the files in private to you) when you should use b:(leech by bot)? When your default settings is leech by user and you want to leech by bot for specific task.
 * u:id/@username(u: means leech by user) This incase OWNER added USER_STRING_SESSION.
@@ -449,6 +446,10 @@ user_settings_text = {
     "UPLOAD_PATHS": "Send Dict of keys that have path values. Example: {'path 1': 'remote:rclonefolder', 'path 2': 'gdrive1 id', 'path 3': 'tg chat id', 'path 4': 'mt:remote:', 'path 5': b:@username} . Timeout: 60 sec",
     "EXCLUDED_EXTENSIONS": "Send excluded extensions separated by space without dot at beginning. Timeout: 60 sec",
     "INCLUDED_EXTENSIONS": "Send included extensions separated by space without dot at beginning. Timeout: 60 sec",
+    "FILES_PER_BATCH": "Send how many files to download/upload per batch. 0 disables batching. Timeout: 60 sec",
+    "BATCH_MAX_SIZE": "Send max batch size (e.g. 2gb). 0 or off disables the size limit. Timeout: 60 sec",
+    "TORRENT_FILE_TYPES": "Send file types to include in batches: video, audio, photo, document, apps. Empty/all disables the filter. Timeout: 60 sec",
+    "SKIP_UPLOADED_FILES": "Use the toggle button to skip files already uploaded for this torrent.",
     "NAME_SUBSTITUTE": r"""Word Subtitions. You can add pattern instead of normal text. Timeout: 60 sec
 NOTE: You must add \ before any character, those are the characters: \^$.|?*+()[]{}-
 Example: script/code/s | mirror/leech | tea/ /s | clone | cpu/ | \[mltb\]/mltb | \\text\\/text/s

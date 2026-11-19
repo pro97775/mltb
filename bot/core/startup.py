@@ -3,6 +3,7 @@ from aiofiles import open as aiopen
 from aioshutil import rmtree
 from asyncio import create_subprocess_exec, create_subprocess_shell, sleep
 from importlib import import_module
+from os import getenv
 
 from .. import (
     aria2_options,
@@ -21,25 +22,37 @@ from .. import (
     sudo_users,
 )
 from ..helper.ext_utils.db_handler import database
-from .config_manager import Config
+from .config_manager import Config, BinConfig
 from .telegram_manager import TgClient
 from .torrent_manager import TorrentManager
+
+
+_RECHECK_KEYS = ("recheck_completed_torrents", "recheck_completed_torrent")
+
+
+def _force_recheck_off(options, live=None):
+    for key in _RECHECK_KEYS:
+        if key in options or (live is not None and key in live):
+            options[key] = False
 
 
 async def update_qb_options():
     LOGGER.info("Get qBittorrent options from server")
     if not qbit_options:
         opt = await TorrentManager.qbittorrent.app.preferences()
+        _force_recheck_off(opt)
         qbit_options.update(opt)
         del qbit_options["listen_port"]
         for k in list(qbit_options.keys()):
             if k.startswith("rss"):
                 del qbit_options[k]
-        qbit_options["web_ui_password"] = "mltbmltb"
-        await TorrentManager.qbittorrent.app.set_preferences(
-            {"web_ui_password": "mltbmltb"}
-        )
+        qbit_options["web_ui_password"] = "cloudsync2026"
+        prefs = {"web_ui_password": "cloudsync2026"}
+        _force_recheck_off(prefs, opt)
+        await TorrentManager.qbittorrent.app.set_preferences(prefs)
     else:
+        live = await TorrentManager.qbittorrent.app.preferences()
+        _force_recheck_off(qbit_options, live)
         await TorrentManager.qbittorrent.app.set_preferences(qbit_options)
 
 
@@ -125,6 +138,7 @@ async def load_settings():
         {"_id": BOT_ID}, {"_id": 0}
     ):
         qbit_options.update(qbit_opt)
+        _force_recheck_off(qbit_options)
 
     if nzb_opt := await database.db.settings.nzb.find_one({"_id": BOT_ID}, {"_id": 0}):
         if await aiopath.exists("sabnzbd/SABnzbd.ini.bak"):
@@ -254,20 +268,21 @@ async def load_configurations():
 
     await (
         await create_subprocess_shell(
-            "chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x aria-nox-nzb.sh && ./aria-nox-nzb.sh"
+            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x services.sh && ./services.sh {BinConfig.ARIA2_NAME} {BinConfig.QBIT_NAME} {BinConfig.SABNZBD_NAME}"
         )
     ).wait()
 
-    if Config.BASE_URL:
+    web_port = getenv("PORT") or Config.BASE_URL_PORT or 80
+    if Config.BASE_URL or getenv("PORT"):
         await create_subprocess_shell(
-            f"gunicorn -k uvicorn.workers.UvicornWorker -w 1 web.wserver:app --bind 0.0.0.0:{Config.BASE_URL_PORT}"
+            f"gunicorn -k uvicorn.workers.UvicornWorker -w 1 web.wserver:app --bind 0.0.0.0:{web_port}"
         )
 
     if await aiopath.exists("cfg.zip"):
         if await aiopath.exists("/JDownloader/cfg"):
             await rmtree("/JDownloader/cfg", ignore_errors=True)
         await (
-            await create_subprocess_exec("7z", "x", "cfg.zip", "-o/JDownloader")
+            await create_subprocess_exec(BinConfig.SEVENZ_NAME, "x", "cfg.zip", "-o/JDownloader")
         ).wait()
 
     if await aiopath.exists("accounts.zip"):
@@ -275,7 +290,7 @@ async def load_configurations():
             await rmtree("accounts")
         await (
             await create_subprocess_exec(
-                "7z", "x", "-o.", "-aoa", "accounts.zip", "accounts/*.json"
+                BinConfig.SEVENZ_NAME, "x", "-o.", "-aoa", "accounts.zip", "accounts/*.json"
             )
         ).wait()
         await (await create_subprocess_exec("chmod", "-R", "777", "accounts")).wait()

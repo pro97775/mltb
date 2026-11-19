@@ -1,1 +1,3 @@
+appenv/*
 mltbenv/*
+.git

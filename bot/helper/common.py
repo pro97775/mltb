@@ -1,4 +1,3 @@
-from ast import literal_eval
 from aiofiles.os import path as aiopath, remove, makedirs, listdir
 from aiofiles import open as aiopen
 from asyncio import sleep, gather
@@ -26,7 +25,7 @@ from .. import (
     DOWNLOAD_DIR,
     cores,
 )
-from ..core.config_manager import Config
+from ..core.config_manager import Config, BinConfig
 from ..core.telegram_manager import TgClient
 from .ext_utils.bot_utils import new_task, sync_to_async, get_size_bytes
 from .ext_utils.bulk_links import extract_bulk_links
@@ -118,6 +117,9 @@ class TaskConfig:
         self.batch_mode = False
         self.batch_current = 0
         self.batch_total = 0
+        self.batch_selected_size = 0
+        self.batch_completed_size = 0
+        self.skip_uploaded_files = False
         self.compress = False
         self.extract = False
         self.join = False
@@ -151,6 +153,34 @@ class TaskConfig:
             "CHANNEL",
             "FORUM",
         ]
+
+    def enable_batch_mode(self):
+        self.batch_mode = True
+        self.seed = False
+        self.stop_duplicate = False
+        self.join = False
+        self.extract = False
+        self.compress = False
+        self.ffmpeg_cmds = None
+        self.convert_audio = False
+        self.convert_video = False
+        self.sample_video = False
+        self.screen_shots = False
+        if not self.file_types:
+            raw_types = (
+                self.user_dict.get("TORRENT_FILE_TYPES")
+                if "TORRENT_FILE_TYPES" in self.user_dict
+                else Config.TORRENT_FILE_TYPES
+            )
+            self.file_types = normalize_types(raw_types)
+        skip_uploaded = (
+            self.user_dict.get("SKIP_UPLOADED_FILES")
+            if "SKIP_UPLOADED_FILES" in self.user_dict
+            else Config.SKIP_UPLOADED_FILES
+        )
+        if isinstance(skip_uploaded, str):
+            skip_uploaded = skip_uploaded.lower() in ("true", "1", "yes", "on")
+        self.skip_uploaded_files = bool(skip_uploaded)
 
     def get_token_path(self, dest):
         if dest.startswith("mt:"):
@@ -226,32 +256,8 @@ class TaskConfig:
             self.batch_max_size = max(0, int(batch_max_size or 0))
         except (TypeError, ValueError):
             self.batch_max_size = 0
-        if self.is_qbit:
-            raw_types = (
-                self.user_dict.get("TORRENT_FILE_TYPES")
-                if "TORRENT_FILE_TYPES" in self.user_dict
-                else Config.TORRENT_FILE_TYPES
-            )
-            self.file_types = normalize_types(raw_types)
-        self.batch_mode = bool(
-            self.is_qbit
-            and self.files_per_batch > 0
-            and not self.select
-            and not self.same_dir
-        )
         if self.select:
             self.file_types = []
-        if self.batch_mode:
-            self.seed = False
-            self.join = False
-            self.extract = False
-            self.compress = False
-            self.ffmpeg_cmds = None
-            self.convert_audio = False
-            self.convert_video = False
-            self.sample_video = False
-            self.screen_shots = False
-            self.name_sub = ""
         if self.batch_mode or self.file_types:
             self.seed = False
         if not self.rc_flags:
@@ -609,7 +615,7 @@ class TaskConfig:
                     if self.clone_dump_chats.startswith(
                         "["
                     ) and self.clone_dump_chats.endswith("]"):
-                        self.clone_dump_chats = literal_eval(self.clone_dump_chats)
+                        self.clone_dump_chats = eval(self.clone_dump_chats)
                     else:
                         self.clone_dump_chats = [self.clone_dump_chats]
                 temp_dict = {}
@@ -821,7 +827,7 @@ class TaskConfig:
                     "taskset",
                     "-c",
                     f"{cores}",
-                    "ffmpeg",
+                    BinConfig.FFMPEG_NAME,
                     "-hide_banner",
                     "-loglevel",
                     "error",

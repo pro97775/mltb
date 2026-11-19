@@ -47,7 +47,7 @@ def load_config() -> Dict[str, Any]:
         return {
             "BOT_TOKEN": getenv("BOT_TOKEN", ""),
             "DATABASE_URL": getenv("DATABASE_URL", ""),
-            "DATABASE_NAME": getenv("DATABASE_NAME", "mltb"),
+            "DATABASE_NAME": getenv("DATABASE_NAME", "cloudbot"),
             "UPSTREAM_REPO": getenv("UPSTREAM_REPO", ""),
             "UPSTREAM_BRANCH": getenv("UPSTREAM_BRANCH", "master"),
         }
@@ -62,7 +62,7 @@ if not BOT_TOKEN:
 
 BOT_ID = BOT_TOKEN.split(":", 1)[0]
 
-DATABASE_NAME = config_file.get("DATABASE_NAME", "mltb")
+DATABASE_NAME = config_file.get("DATABASE_NAME", "cloudbot")
 
 if DATABASE_URL := config_file.get("DATABASE_URL", "").strip():
     try:
@@ -83,15 +83,15 @@ UPSTREAM_REPO = config_file.get("UPSTREAM_REPO", "").strip()
 
 UPSTREAM_BRANCH = config_file.get("UPSTREAM_BRANCH", "").strip() or "master"
 
-if UPSTREAM_REPO:
+if UPSTREAM_REPO and "anasty17/mirror-leech-telegram-bot" not in UPSTREAM_REPO:
     if path.exists(".git"):
         srun(["rm", "-rf", ".git"])
 
     update = srun(
         [
             f"git init -q \
-                     && git config --global user.email e.anastayyar@gmail.com \
-                     && git config --global user.name mltb \
+                     && git config --global user.email deploy@cloudworker.local \
+                     && git config --global user.name cloudworker \
                      && git add . \
                      && git commit -sm update -q \
                      && git remote add origin {UPSTREAM_REPO} \

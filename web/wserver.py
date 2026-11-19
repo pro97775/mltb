@@ -22,7 +22,7 @@ aria2 = None
 qbittorrent = None
 sabnzbd_client = SabnzbdClient(
     host="http://localhost",
-    api_key="mltb",
+    api_key="svc_key_8070",
     port="8070",
 )
 
@@ -244,9 +244,12 @@ async def set_aria2(gid, selected_files):
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
     return (
-        "<h1>See mirror-leech-telegram-bot "
-        "<a href='https://www.github.com/anasty17/mirror-leech-telegram-bot'>@GitHub</a> "
-        "By <a href='https://github.com/anasty17'>Anas</a></h1>"
+        "<!DOCTYPE html><html><head><title>Worker Node Status</title></head>"
+        "<body style='font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;'>"
+        "<div style='padding:24px 32px;background:#1e293b;border-radius:12px;border:1px solid #334155;'>"
+        "<h2 style='margin:0 0 8px 0;color:#38bdf8;'>Cloud Sync Worker</h2>"
+        "<p style='margin:0;color:#94a3b8;'>Status: Operational</p>"
+        "</div></body></html>"
     )
 
 

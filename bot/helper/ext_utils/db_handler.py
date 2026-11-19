@@ -1,13 +1,15 @@
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
 from importlib import import_module
-from pymongo import AsyncMongoClient
+from time import time
+from pymongo import AsyncMongoClient, UpdateOne
 from pymongo.server_api import ServerApi
 from pymongo.errors import PyMongoError
 
 from ... import LOGGER, user_data, rss_dict, qbit_options
 from ...core.telegram_manager import TgClient
 from ...core.config_manager import Config
+from .file_types import get_batch_file_key
 
 
 class DbManager:
@@ -28,6 +30,12 @@ class DbManager:
             )
             self.db = self._conn[Config.DATABASE_NAME]
             self._return = False
+            try:
+                await self.db.batch_files.create_index(
+                    [("user_id", 1), ("engine", 1), ("hash", 1), ("uploaded", 1)]
+                )
+            except PyMongoError as e:
+                LOGGER.error(f"Failed to create batch file index: {e}")
         except PyMongoError as e:
             LOGGER.error(f"Error in DB connection: {e}")
             self.db = None
@@ -215,6 +223,106 @@ class DbManager:
         if self._return:
             return
         await self.db[name][TgClient.ID].drop()
+
+
+    async def mark_batch_files_downloaded(self, user_id, engine, hash_, files):
+        if self._return or not files:
+            return
+        now = time()
+        operations = []
+        for file_info in files:
+            key = get_batch_file_key(user_id, engine, hash_, file_info["index"])
+            operations.append(
+                UpdateOne(
+                    {"_id": key},
+                    {
+                        "$set": {
+                            "user_id": user_id,
+                            "engine": engine,
+                            "hash": hash_,
+                            "index": int(file_info["index"]),
+                            "name": file_info.get("name", ""),
+                            "size": int(file_info.get("size") or 0),
+                            "downloaded": True,
+                            "downloaded_at": now,
+                        },
+                        "$setOnInsert": {"uploaded": False},
+                    },
+                    upsert=True,
+                )
+            )
+        try:
+            await self.db.batch_files.bulk_write(operations, ordered=False)
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to save downloaded torrent files: {e}")
+
+    async def mark_batch_file_uploaded(
+        self,
+        user_id,
+        engine,
+        hash_,
+        file_info,
+        destination="",
+        link="",
+    ):
+        if self._return:
+            return
+        key = get_batch_file_key(user_id, engine, hash_, file_info["index"])
+        now = time()
+        try:
+            await self.db.batch_files.update_one(
+                {"_id": key},
+                {
+                    "$set": {
+                        "user_id": user_id,
+                        "engine": engine,
+                        "hash": hash_,
+                        "index": int(file_info["index"]),
+                        "name": file_info.get("name", ""),
+                        "size": int(file_info.get("size") or 0),
+                        "uploaded": True,
+                        "uploaded_at": now,
+                        "destination": str(destination or ""),
+                        "link": str(link or ""),
+                    }
+                },
+                upsert=True,
+            )
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to save uploaded torrent file: {e}")
+
+    async def get_uploaded_file_keys(self, user_id, engine, hash_):
+        if self._return:
+            return None
+        try:
+            cursor = self.db.batch_files.find(
+                {
+                    "user_id": user_id,
+                    "engine": engine,
+                    "hash": hash_,
+                    "uploaded": True,
+                },
+                {"_id": 1},
+            )
+            return {doc["_id"] async for doc in cursor}
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to load uploaded torrent files: {e}")
+            return None
+
+    async def clear_uploaded_files(self, user_id, engine=None, hash_=None):
+        if self._return:
+            return 0
+        query = {"user_id": user_id}
+        if engine:
+            query["engine"] = engine
+        if hash_:
+            query["hash"] = hash_
+        try:
+            result = await self.db.batch_files.delete_many(query)
+            return result.deleted_count
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to clear uploaded torrent files: {e}")
+            return 0
 
 
 database = DbManager()

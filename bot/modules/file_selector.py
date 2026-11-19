@@ -57,6 +57,12 @@ async def select(_, message):
     ):
         await send_message(message, "This task is not for you!")
         return
+    if task.listener.batch_mode:
+        await send_message(
+            message,
+            "This task is downloading in batches; file selection is not available.",
+        )
+        return
     if not iscoroutinefunction(task.status):
         await send_message(message, "The task have finished the download stage!")
         return
@@ -112,6 +118,12 @@ async def select_callback(query):
         and (user_id not in user_data or not user_data[user_id].get("SUDO"))
     ):
         await query.answer("This task is not for you!", show_alert=True)
+        return
+    if task.listener.batch_mode:
+        await query.answer(
+            "This task is downloading in batches; file selection is not available.",
+            show_alert=True,
+        )
         return
     if not iscoroutinefunction(task.status):
         await query.answer(

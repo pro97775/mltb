@@ -19,6 +19,8 @@ from .. import (
 from ..core.config_manager import Config
 from ..core.telegram_manager import TgClient
 from ..helper.ext_utils.db_handler import database
+from ..helper.ext_utils.file_types import normalize_types
+from ..helper.ext_utils.status_utils import get_readable_file_size
 from ..helper.ext_utils.media_utils import create_thumb
 from ..helper.telegram_helper.button_build import ButtonMaker
 from ..helper.ext_utils.help_messages import user_settings_text
@@ -27,8 +29,6 @@ from ..helper.ext_utils.bot_utils import (
     new_task,
     get_size_bytes,
 )
-from ..helper.ext_utils.file_types import FILE_TYPE_GROUPS, normalize_types
-from ..helper.ext_utils.status_utils import get_readable_file_size
 from ..helper.telegram_helper.message_utils import (
     send_message,
     edit_message,
@@ -49,7 +49,12 @@ leech_options = [
 rclone_options = ["RCLONE_CONFIG", "RCLONE_PATH", "RCLONE_FLAGS"]
 gdrive_options = ["TOKEN_PICKLE", "GDRIVE_ID", "INDEX_URL"]
 uploaders_options = ["BUZZHEAVIER_ACCOUNT_ID", "BUZZHEAVIER_FOLDER_ID"]
-torrent_options = ["FILES_PER_BATCH", "BATCH_MAX_SIZE", "TORRENT_FILE_TYPES"]
+torrent_options = [
+    "FILES_PER_BATCH",
+    "BATCH_MAX_SIZE",
+    "TORRENT_FILE_TYPES",
+    "SKIP_UPLOADED_FILES",
+]
 
 
 async def get_user_settings(from_user, stype="main"):
@@ -294,55 +299,64 @@ Stop Duplicate is <b>{sd_msg}</b>"""
 Buzzheavier Account ID: {bh_acc}
 Buzzheavier Folder ID: {bh_fol}"""
     elif stype == "torrent":
+        files_per_batch = (
+            user_dict["FILES_PER_BATCH"]
+            if "FILES_PER_BATCH" in user_dict
+            else Config.FILES_PER_BATCH
+        )
+        batch_max_size = (
+            user_dict["BATCH_MAX_SIZE"]
+            if "BATCH_MAX_SIZE" in user_dict
+            else Config.BATCH_MAX_SIZE
+        )
+        try:
+            max_size_value = int(batch_max_size or 0)
+        except (TypeError, ValueError):
+            max_size_value = 0
+        max_size_text = (
+            get_readable_file_size(max_size_value) if max_size_value else "Off"
+        )
+        raw_types = (
+            user_dict.get("TORRENT_FILE_TYPES")
+            if "TORRENT_FILE_TYPES" in user_dict
+            else Config.TORRENT_FILE_TYPES
+        )
+        file_types = normalize_types(raw_types)
+        types_text = ", ".join(file_types) if file_types else "All files"
+        skip_uploaded = (
+            user_dict.get("SKIP_UPLOADED_FILES")
+            if "SKIP_UPLOADED_FILES" in user_dict
+            else Config.SKIP_UPLOADED_FILES
+        )
+        if isinstance(skip_uploaded, str):
+            skip_uploaded = skip_uploaded.lower() in ("true", "1", "yes", "on")
+        skip_enabled = bool(skip_uploaded)
+
         buttons.data_button(
             "Files per Batch", f"userset {user_id} menu FILES_PER_BATCH"
         )
-        buttons.data_button("Batch Max Size", f"userset {user_id} menu BATCH_MAX_SIZE")
-        if "TORRENT_FILE_TYPES" in user_dict:
-            selected_types = normalize_types(user_dict.get("TORRENT_FILE_TYPES"))
-        else:
-            selected_types = normalize_types(Config.TORRENT_FILE_TYPES)
-        for file_type in FILE_TYPE_GROUPS:
-            state = "ON" if file_type in selected_types else "OFF"
-            buttons.data_button(
-                f"{file_type.title()}: {state}",
-                f"userset {user_id} ftype {file_type}",
-            )
-        if selected_types:
-            buttons.data_button(
-                "Clear File Type Filter", f"userset {user_id} ftype reset"
-            )
+        buttons.data_button(
+            "Batch Max Size", f"userset {user_id} menu BATCH_MAX_SIZE"
+        )
+        buttons.data_button(
+            "Torrent File Types", f"userset {user_id} menu TORRENT_FILE_TYPES"
+        )
+        buttons.data_button(
+            f"Skip Uploaded: {'ON' if skip_enabled else 'OFF'}",
+            f"userset {user_id} tog SKIP_UPLOADED_FILES {'f' if skip_enabled else 't'}",
+        )
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
-        if "FILES_PER_BATCH" in user_dict:
-            files_per_batch = user_dict["FILES_PER_BATCH"] or 0
-        else:
-            files_per_batch = Config.FILES_PER_BATCH
-        if "BATCH_MAX_SIZE" in user_dict:
-            batch_max_size = user_dict["BATCH_MAX_SIZE"] or 0
-        else:
-            batch_max_size = Config.BATCH_MAX_SIZE
-        try:
-            batch_max_size = int(batch_max_size or 0)
-        except (TypeError, ValueError):
-            batch_max_size = 0
-        batch_max_size = (
-            get_readable_file_size(batch_max_size) if batch_max_size else "Off"
-        )
-        types_text = ", ".join(selected_types) if selected_types else "All files"
-        text = f"""<u>Torrent Settings for {name}</u>
-Files per Batch is <b>{files_per_batch or 'Off (whole torrent)'}</b>
-Batch Max Size is <b>{batch_max_size}</b>
-File Types is <code>{types_text}</code>
-
-Batching downloads only the selected number of files, uploads them, then
-deletes them before starting the next files."""
+        text = f"""<u>Torrent Batching for {name}</u>
+Files per Batch: {files_per_batch or "Off"}
+Batch Max Size: {max_size_text}
+Torrent File Types: {types_text}
+Skip Uploaded Files: {"ON" if skip_enabled else "OFF"}"""
     else:
         buttons.data_button("Leech", f"userset {user_id} leech")
         buttons.data_button("Rclone", f"userset {user_id} rclone")
         buttons.data_button("Gdrive API", f"userset {user_id} gdrive")
         buttons.data_button("Uploaders", f"userset {user_id} uploaders")
-        buttons.data_button("Torrent", f"userset {user_id} torrent")
 
         upload_paths = user_dict.get("UPLOAD_PATHS", {})
         if not upload_paths and "UPLOAD_PATHS" not in user_dict and Config.UPLOAD_PATHS:
@@ -373,6 +387,7 @@ deletes them before starting the next files."""
         buttons.data_button(
             "Excluded Extensions", f"userset {user_id} menu EXCLUDED_EXTENSIONS"
         )
+        buttons.data_button("Torrent Batching", f"userset {user_id} torrent")
         if user_dict.get("EXCLUDED_EXTENSIONS", False):
             ex_ex = user_dict["EXCLUDED_EXTENSIONS"]
         elif "EXCLUDED_EXTENSIONS" not in user_dict:
@@ -531,28 +546,6 @@ async def set_option(_, message, option):
         if not value.isdigit():
             value = get_size_bytes(value)
         value = min(int(value), TgClient.MAX_SPLIT_SIZE)
-    elif option == "FILES_PER_BATCH":
-        if not value.strip().isdigit():
-            await send_message(
-                message,
-                "Send how many files to download per batch. Example: 1 or 3. Send 0 to disable batching.",
-            )
-            return
-        value = int(value)
-    elif option == "BATCH_MAX_SIZE":
-        try:
-            value = (
-                int(value)
-                if value.strip().isdigit()
-                else get_size_bytes(value.strip())
-            )
-        except ValueError:
-            await send_message(
-                message, "Send a valid size. Example: 2gb or 800mb. Send 0 for no cap."
-            )
-            return
-    elif option == "TORRENT_FILE_TYPES":
-        value = normalize_types(value)
     elif option == "EXCLUDED_EXTENSIONS":
         fx = value.split()
         value = ["aria2", "!qB"]
@@ -565,6 +558,28 @@ async def set_option(_, message, option):
         for x in fx:
             x = x.lstrip(".")
             value.append(x.strip().lower())
+    elif option == "FILES_PER_BATCH":
+        try:
+            value = max(0, int(value))
+        except (TypeError, ValueError):
+            await send_message(message, "Files per batch must be a number.")
+            return
+    elif option == "BATCH_MAX_SIZE":
+        lowered = value.strip().lower()
+        if lowered in ("", "0", "off", "none"):
+            value = 0
+        elif value.isdigit():
+            value = int(value)
+        else:
+            value = int(get_size_bytes(value) or 0)
+            if value <= 0:
+                await send_message(
+                    message,
+                    "Send bytes (e.g. 5000000000) or a size like 100gb / 800mb. 0 disables the cap.",
+                )
+                return
+    elif option == "TORRENT_FILE_TYPES":
+        value = normalize_types(value)
     elif option == "INDEX_URL":
         value = value
     elif option in [
@@ -758,29 +773,13 @@ async def edit_user_settings(client, query):
         update_user_ldata(user_id, data[3], data[4] == "t")
         if data[3] == "STOP_DUPLICATE":
             back_to = "gdrive"
+        elif data[3] == "SKIP_UPLOADED_FILES":
+            back_to = "torrent"
         elif data[3] == "USER_TOKENS":
             back_to = "main"
         else:
             back_to = "leech"
         await update_user_settings(query, stype=back_to)
-        await database.update_user_data(user_id)
-    elif data[2] == "ftype":
-        await query.answer()
-        if data[3] == "reset":
-            update_user_ldata(user_id, "TORRENT_FILE_TYPES", [])
-        else:
-            if "TORRENT_FILE_TYPES" in user_dict:
-                selected = normalize_types(user_dict.get("TORRENT_FILE_TYPES"))
-            else:
-                selected = normalize_types(Config.TORRENT_FILE_TYPES)
-            if data[3] in selected:
-                selected.remove(data[3])
-            else:
-                selected.append(data[3])
-            update_user_ldata(
-                user_id, "TORRENT_FILE_TYPES", normalize_types(selected)
-            )
-        await update_user_settings(query, "torrent")
         await database.update_user_data(user_id)
     elif data[2] == "file":
         await query.answer()

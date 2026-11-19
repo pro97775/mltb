@@ -9,7 +9,7 @@ from secrets import token_urlsafe
 from httpx import AsyncClient
 
 from .... import LOGGER, task_dict, task_dict_lock
-from ....core.config_manager import Config
+from ....core.config_manager import Config, BinConfig
 from ...ext_utils.bot_utils import cmd_exec
 from ...ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from ...ext_utils.status_utils import MirrorStatus
@@ -285,7 +285,7 @@ class TldvDownloader:
             # 6. Remux output.ts into output.mp4
             final_mp4 = os.path.join(self._path, self.name)
             cmd = [
-                "ffmpeg",
+                BinConfig.FFMPEG_NAME,
                 "-y",
                 "-i",
                 output_ts,

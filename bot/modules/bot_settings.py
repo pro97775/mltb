@@ -35,7 +35,7 @@ from ..helper.ext_utils.bot_utils import (
     SetInterval,
     new_task,
 )
-from ..core.config_manager import Config
+from ..core.config_manager import Config, BinConfig
 from ..core.telegram_manager import TgClient
 from ..core.torrent_manager import TorrentManager
 from ..core.startup import update_qb_options, update_nzb_options, update_variables
@@ -438,7 +438,7 @@ async def sync_jdownloader():
     if await aiopath.exists("cfg.zip"):
         await remove("cfg.zip")
     await (
-        await create_subprocess_exec("7z", "a", "cfg.zip", "/JDownloader/cfg")
+        await create_subprocess_exec(BinConfig.SEVENZ_NAME, "a", "cfg.zip", "/JDownloader/cfg")
     ).wait()
     await database.update_private_file("cfg.zip")
 
@@ -474,7 +474,7 @@ async def update_private_file(_, message, pre_message):
                 await rmtree("rclone_sa", ignore_errors=True)
             await (
                 await create_subprocess_exec(
-                    "7z", "x", "-o.", "-aoa", "accounts.zip", "accounts/*.json"
+                    BinConfig.SEVENZ_NAME, "x", "-o.", "-aoa", "accounts.zip", "accounts/*.json"
                 )
             ).wait()
             await (

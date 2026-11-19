@@ -4,6 +4,7 @@ from secrets import token_urlsafe
 from aiofiles.os import remove
 
 from .. import LOGGER, task_dict, task_dict_lock, bot_loop
+from ..core.config_manager import BinConfig
 from ..helper.ext_utils.bot_utils import (
     sync_to_async,
     cmd_exec,
@@ -183,7 +184,7 @@ class Clone(TaskListener):
             else:
                 src_path = self.link
                 cmd = [
-                    "rclone",
+                    BinConfig.RCLONE_NAME,
                     "lsjson",
                     "--fast-list",
                     "--stat",
@@ -236,7 +237,7 @@ class Clone(TaskListener):
                 return
             LOGGER.info(f"Cloning Done: {self.name}")
             cmd1 = [
-                "rclone",
+                BinConfig.RCLONE_NAME,
                 "lsf",
                 "--fast-list",
                 "-R",
@@ -246,7 +247,7 @@ class Clone(TaskListener):
                 destination,
             ]
             cmd2 = [
-                "rclone",
+                BinConfig.RCLONE_NAME,
                 "lsf",
                 "--fast-list",
                 "-R",
@@ -256,7 +257,7 @@ class Clone(TaskListener):
                 destination,
             ]
             cmd3 = [
-                "rclone",
+                BinConfig.RCLONE_NAME,
                 "size",
                 "--fast-list",
                 "--json",

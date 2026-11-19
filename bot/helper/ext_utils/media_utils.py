@@ -1,4 +1,3 @@
-from json import loads
 from PIL import Image
 from aiofiles.os import remove, path as aiopath, makedirs
 from asyncio import (
@@ -13,6 +12,7 @@ from time import time
 from aioshutil import rmtree
 
 from ... import LOGGER, DOWNLOAD_DIR, threads, cores
+from ...core.config_manager import BinConfig
 from .bot_utils import cmd_exec, sync_to_async
 from .files_utils import get_mime_type, is_archive, is_archive_split
 from .status_utils import time_to_seconds
@@ -40,7 +40,7 @@ async def get_media_info(path):
     try:
         result = await cmd_exec(
             [
-                "ffprobe",
+                BinConfig.FFPROBE_NAME,
                 "-hide_banner",
                 "-loglevel",
                 "error",
@@ -54,7 +54,7 @@ async def get_media_info(path):
         LOGGER.error(f"Get Media Info: {e}. Mostly File not found! - File: {path}")
         return 0, None, None
     if result[0] and result[2] == 0:
-        fields = loads(result[0]).get("format")
+        fields = eval(result[0]).get("format")
         if fields is None:
             LOGGER.error(f"get_media_info: {result}")
             return 0, None, None
@@ -80,7 +80,7 @@ async def get_document_type(path):
     try:
         result = await cmd_exec(
             [
-                "ffprobe",
+                BinConfig.FFPROBE_NAME,
                 "-hide_banner",
                 "-loglevel",
                 "error",
@@ -102,7 +102,7 @@ async def get_document_type(path):
             is_video = True
         return is_video, is_audio, is_image
     if result[0] and result[2] == 0:
-        fields = loads(result[0]).get("streams")
+        fields = eval(result[0]).get("streams")
         if fields is None:
             LOGGER.error(f"get_document_type: {result}")
             return is_video, is_audio, is_image
@@ -133,7 +133,7 @@ async def take_ss(video_file, ss_nb) -> bool:
                 "taskset",
                 "-c",
                 f"{cores}",
-                "ffmpeg",
+                BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
                 "error",
@@ -179,7 +179,7 @@ async def get_audio_thumbnail(audio_file):
         "taskset",
         "-c",
         f"{cores}",
-        "ffmpeg",
+        BinConfig.FFMPEG_NAME,
         "-hide_banner",
         "-loglevel",
         "error",
@@ -220,7 +220,7 @@ async def get_video_thumbnail(video_file, duration):
         "taskset",
         "-c",
         f"{cores}",
-        "ffmpeg",
+        BinConfig.FFMPEG_NAME,
         "-hide_banner",
         "-loglevel",
         "error",
@@ -266,7 +266,7 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots):
         "taskset",
         "-c",
         f"{cores}",
-        "ffmpeg",
+        BinConfig.FFMPEG_NAME,
         "-hide_banner",
         "-loglevel",
         "error",
@@ -416,7 +416,7 @@ class FFMpeg:
                     prefix = ""
             else:
                 prefix = f"ffmpeg{index}."
-            output = f"{dir}/{prefix}{output_file.replace("mltb", base_name)}{ext}"
+            output = f"{dir}/{prefix}{output_file.replace('mltb', base_name)}{ext}"
             outputs.append(output)
             ffmpeg[index] = output
         if self._listener.is_cancelled:
@@ -457,7 +457,7 @@ class FFMpeg:
                 "taskset",
                 "-c",
                 f"{cores}",
-                "ffmpeg",
+                BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
                 "error",
@@ -486,7 +486,7 @@ class FFMpeg:
                 "taskset",
                 "-c",
                 f"{cores}",
-                "ffmpeg",
+                BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
                 "error",
@@ -540,7 +540,7 @@ class FFMpeg:
             "taskset",
             "-c",
             f"{cores}",
-            "ffmpeg",
+            BinConfig.FFMPEG_NAME,
             "-hide_banner",
             "-loglevel",
             "error",
@@ -613,7 +613,7 @@ class FFMpeg:
             "taskset",
             "-c",
             f"{cores}",
-            "ffmpeg",
+            BinConfig.FFMPEG_NAME,
             "-hide_banner",
             "-loglevel",
             "error",
@@ -677,7 +677,7 @@ class FFMpeg:
                 "taskset",
                 "-c",
                 f"{cores}",
-                "ffmpeg",
+                BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
                 "error",

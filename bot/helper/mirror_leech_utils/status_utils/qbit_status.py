@@ -30,6 +30,8 @@ class QbittorrentStatus:
         self._info = await get_download(f"{self.listener.mid}", self._info)
 
     def progress(self):
+        if self.listener.batch_mode and self.listener.batch_selected_size:
+            return f"{round(self.listener.batch_completed_size / self.listener.batch_selected_size * 100, 2)}%"
         return f"{round(self._info.progress * 100, 2)}%"
 
     def processed_bytes(self):
@@ -44,10 +46,7 @@ class QbittorrentStatus:
         else:
             name = self.listener.name
         if self.listener.batch_mode and self.listener.batch_total:
-            name = (
-                f"[{self.listener.batch_current}/"
-                f"{self.listener.batch_total}] {name}"
-            )
+            return f"[{self.listener.batch_current}/{self.listener.batch_total}] {name}"
         return name
 
     def size(self):

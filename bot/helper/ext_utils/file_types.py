@@ -4,24 +4,69 @@ from os import path as ospath
 
 FILE_TYPE_GROUPS = {
     "video": {
+        "264",
+        "265",
         "3g2",
         "3gp",
+        "3gp2",
+        "3gpp",
+        "3gpp2",
+        "amv",
+        "asf",
+        "avc",
         "avi",
+        "divx",
+        "drc",
+        "dv",
+        "f4v",
         "flv",
+        "gvi",
+        "gxf",
+        "h264",
+        "h265",
+        "hevc",
+        "ivf",
+        "m1v",
+        "m2p",
+        "m2t",
         "m2ts",
+        "m2v",
+        "m4s",
         "m4v",
+        "mk3d",
         "mkv",
         "mov",
         "mp4",
+        "mp4v",
+        "mpe",
         "mpeg",
+        "mpeg2",
+        "mpeg4",
         "mpg",
+        "mpv",
         "mts",
+        "mxf",
+        "mxg",
+        "nsv",
+        "nut",
+        "ogm",
         "ogv",
+        "ogx",
+        "qt",
+        "rm",
         "rmvb",
+        "roq",
+        "svi",
+        "tod",
         "ts",
         "vob",
+        "vro",
         "webm",
+        "wm",
         "wmv",
+        "wtv",
+        "xvid",
+        "y4m",
     },
     "audio": {
         "aac",
@@ -113,10 +158,12 @@ def is_extension_allowed(name: str, included=None, excluded=None) -> bool:
     extension = get_extension(name)
     if included and extension not in included:
         return False
-    return extension not in (excluded or [])
+    if isinstance(excluded, str):
+        excluded = excluded.split()
+    return extension not in {str(item).lower() for item in (excluded or [])}
 
 
-def normalize_types(value) -> list[str]:
+def normalize_types(value) -> list:
     """Normalize a user/config file-type value into a stable list of keys."""
     if not value:
         return []
@@ -142,6 +189,18 @@ def get_file_size(file_info) -> int:
     if isinstance(file_info, dict):
         return int(file_info.get("size") or 0)
     return int(getattr(file_info, "size", 0) or 0)
+
+
+def get_batch_file_key(user_id, engine, torrent_hash, file_index) -> str:
+    """Stable per-user key for one torrent file."""
+    return f"{user_id}:{engine}:{torrent_hash}:{int(file_index)}"
+
+
+def filter_uploaded_files(files, uploaded_keys, key_builder) -> list:
+    """Return only files that are not present in the uploaded-file ledger."""
+    if not uploaded_keys:
+        return list(files)
+    return [file_info for file_info in files if key_builder(file_info) not in uploaded_keys]
 
 
 def plan_batch(files, max_files: int = 0, max_size: int = 0) -> list:

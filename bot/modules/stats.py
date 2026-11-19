@@ -15,17 +15,18 @@ from psutil import (
 from .. import bot_start_time
 from ..helper.ext_utils.status_utils import get_readable_file_size, get_readable_time
 from ..helper.ext_utils.bot_utils import cmd_exec, new_task
+from ..core.config_manager import BinConfig
 from ..helper.telegram_helper.message_utils import send_message
 
 commands = {
-    "aria2": (["aria2c", "--version"], r"aria2 version ([\d.]+)"),
-    "qBittorrent": (["qbittorrent-nox", "--version"], r"qBittorrent v([\d.]+)"),
-    "SABnzbd+": (["sabnzbdplus", "--version"], r"sabnzbdplus-([\d.]+)"),
+    "aria2": ([BinConfig.ARIA2_NAME, "--version"], r"aria2 version ([\d.]+)"),
+    "qBittorrent": ([BinConfig.QBIT_NAME, "--version"], r"qBittorrent v([\d.]+)"),
+    "SABnzbd+": ([BinConfig.SABNZBD_NAME, "--version"], rf"{BinConfig.SABNZBD_NAME}-([\d.]+)"),
     "python": (["python3", "--version"], r"Python ([\d.]+)"),
-    "rclone": (["rclone", "--version"], r"rclone v([\d.]+)"),
+    "rclone": ([BinConfig.RCLONE_NAME, "--version"], r"rclone v([\d.]+)"),
     "yt-dlp": (["yt-dlp", "--version"], r"([\d.]+)"),
-    "ffmpeg": (["ffmpeg", "-version"], r"ffmpeg version ([\d.]+(-\w+)?).*"),
-    "7z": (["7z", "i"], r"7-Zip ([\d.]+)"),
+    "ffmpeg": ([BinConfig.FFMPEG_NAME, "-version"], r"ffmpeg version ([\d.]+(-\w+)?).*"),
+    "7z": ([BinConfig.SEVENZ_NAME, "i"], r"7-Zip ([\d.]+)"),
 }
 
 

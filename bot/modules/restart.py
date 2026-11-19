@@ -14,7 +14,7 @@ from ..helper.ext_utils.db_handler import database
 from ..helper.ext_utils.files_utils import clean_all
 from ..helper.telegram_helper.button_build import ButtonMaker
 from ..core.telegram_manager import TgClient
-from ..core.config_manager import Config
+from ..core.config_manager import Config, BinConfig
 from ..core.jdownloader_booter import jdownloader
 from ..core.torrent_manager import TorrentManager
 
@@ -125,7 +125,7 @@ async def confirm_restart(_, query):
             "pkill",
             "-9",
             "-f",
-            "gunicorn|aria2c|qbittorrent-nox|ffmpeg|rclone|java|sabnzbdplus|7z|split",
+            f"gunicorn|{BinConfig.ARIA2_NAME}|{BinConfig.QBIT_NAME}|{BinConfig.FFMPEG_NAME}|{BinConfig.FFPROBE_NAME}|{BinConfig.RCLONE_NAME}|java|{BinConfig.SABNZBD_NAME}|{BinConfig.SEVENZ_NAME}|split",
         )
         proc2 = await create_subprocess_exec("python3", "update.py")
         await gather(proc1.wait(), proc2.wait())

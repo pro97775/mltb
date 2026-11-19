@@ -16,6 +16,7 @@ from aiofiles.os import (
 )
 
 from ... import LOGGER, DOWNLOAD_DIR
+from ...core.config_manager import BinConfig
 from ...core.torrent_manager import TorrentManager
 from .bot_utils import sync_to_async, cmd_exec
 from .exceptions import NotSupportedExtractionArchive
@@ -417,7 +418,7 @@ class SevenZ:
 
     async def extract(self, f_path, t_path, pswd):
         cmd = [
-            "7z",
+            BinConfig.SEVENZ_NAME,
             "x",
             f"-p{pswd}",
             f_path,
@@ -461,7 +462,7 @@ class SevenZ:
         else:
             split_size = self._listener.split_size
         cmd = [
-            "7z",
+            BinConfig.SEVENZ_NAME,
             f"-v{split_size}b",
             "a",
             "-mx=0",

@@ -6,6 +6,7 @@ from yt_dlp import YoutubeDL, DownloadError
 
 
 from .... import task_dict_lock, task_dict
+from ....core.config_manager import BinConfig
 from ...ext_utils.bot_utils import sync_to_async, async_to_sync
 from ...ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from ...mirror_leech_utils.status_utils.queue_status import QueueStatus
@@ -65,6 +66,7 @@ class YoutubeDLHelper:
             "overwrites": True,
             "writethumbnail": True,
             "trim_file_name": 220,
+            "ffmpeg_location": "/opt/media-tools" if ospath.exists("/opt/media-tools") else f"/usr/bin/{BinConfig.FFMPEG_NAME}",
             "fragment_retries": 10,
             "retries": 10,
             "retry_sleep_functions": {
@@ -134,7 +136,7 @@ class YoutubeDLHelper:
 
     def _extract_meta_data(self):
         if self._listener.link.startswith(("rtmp", "mms", "rstp", "rtmps")):
-            self.opts["external_downloader"] = "ffmpeg"
+            self.opts["external_downloader"] = BinConfig.FFMPEG_NAME
         with YoutubeDL(self.opts) as ydl:
             try:
                 result = ydl.extract_info(self._listener.link, download=False)

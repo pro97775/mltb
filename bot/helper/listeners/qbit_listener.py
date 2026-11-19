@@ -35,6 +35,8 @@ async def _on_download_error(err, tor, button=None):
     LOGGER.info(f"Cancelling Download: {tor.name}")
     ext_hash = tor.hash
     if task := await get_task_by_gid(ext_hash[:12]):
+        if task.listener.batch_mode:
+            return
         await task.listener.on_download_error(err, button)
     await TorrentManager.qbittorrent.torrents.stop([ext_hash])
     await sleep(0.3)
@@ -46,6 +48,8 @@ async def _on_seed_finish(tor):
     ext_hash = tor.hash
     LOGGER.info(f"Cancelling Seed: {tor.name}")
     if task := await get_task_by_gid(ext_hash[:12]):
+        if task.listener.batch_mode:
+            return
         msg = f"Seeding stopped with Ratio: {round(tor.ratio, 3)} and Time: {get_readable_time(int(tor.seeding_time.total_seconds() or "0"))}"
         await task.listener.on_upload_error(msg)
     await _remove_torrent(ext_hash, tor.tags[0])
@@ -54,6 +58,8 @@ async def _on_seed_finish(tor):
 @new_task
 async def _stop_duplicate(tor):
     if task := await get_task_by_gid(tor.hash[:12]):
+        if task.listener.batch_mode:
+            return
         if task.listener.stop_duplicate:
             task.listener.name = tor.content_path.rsplit("/", 1)[-1].rsplit(".!qB", 1)[
                 0
@@ -69,11 +75,10 @@ async def _on_download_complete(tor):
     tag = tor.tags[0]
     if task := await get_task_by_gid(ext_hash[:12]):
         if task.listener.batch_mode:
-            qb_torrents[tag]["uploaded"] = True
             return
         if not task.listener.seed:
             await TorrentManager.qbittorrent.torrents.stop([ext_hash])
-        if task.listener.select or task.listener.file_types:
+        if task.listener.select:
             await clean_unwanted(task.listener.dir)
             path = tor.content_path.rsplit("/", 1)[0]
             res = await TorrentManager.qbittorrent.torrents.files(ext_hash)
@@ -143,6 +148,8 @@ async def _qb_listener():
                             qb_torrents[tag]["stop_dup_check"] = True
                             await _stop_duplicate(tor_info)
                     elif state == "stalledDL":
+                        if qb_torrents[tag].get("batch"):
+                            continue
                         if (
                             not qb_torrents[tag]["rechecked"]
                             and 0.99989999999999999 < tor_info.progress < 1
@@ -166,6 +173,8 @@ async def _qb_listener():
                                 [tor_info.hash]
                             )
                     elif state == "missingFiles":
+                        if qb_torrents[tag].get("batch"):
+                            continue
                         await TorrentManager.qbittorrent.torrents.recheck(
                             [tor_info.hash]
                         )

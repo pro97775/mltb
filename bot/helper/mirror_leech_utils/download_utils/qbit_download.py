@@ -14,8 +14,9 @@ from .... import (
 from ....core.config_manager import Config
 from ....core.torrent_manager import TorrentManager
 from ...ext_utils.bot_utils import bt_selection_buttons
+from ...ext_utils.links_utils import is_gdrive_id, is_rclone_path
 from ...ext_utils.task_manager import check_running_tasks
-from ...listeners.qbit_batch import prepare_qbit_selection
+from ...listeners.qbit_batch import add_qb_batch
 from ...listeners.qbit_listener import on_download_start
 from ...mirror_leech_utils.status_utils.qbit_status import QbittorrentStatus
 from ...telegram_helper.message_utils import (
@@ -44,6 +45,19 @@ def _get_hash_file(fpath):
 
 
 async def add_qb_torrent(listener, path, ratio, seed_time):
+    if listener.files_per_batch > 0:
+        if (
+            listener.is_leech
+            or is_gdrive_id(listener.up_dest)
+            or is_rclone_path(listener.up_dest)
+        ):
+            listener.enable_batch_mode()
+            await add_qb_batch(listener, path, ratio, seed_time)
+            return
+        LOGGER.warning(
+            "Batching supports leech, Google Drive and rclone only. "
+            "Downloading the whole torrent instead."
+        )
     try:
         form = AddFormBuilder.with_client(TorrentManager.qbittorrent)
         if await aiopath.exists(listener.link):
@@ -95,23 +109,6 @@ async def add_qb_torrent(listener, path, ratio, seed_time):
             LOGGER.info(f"QbitDownload started: {tor_info.name} - Hash: {ext_hash}")
 
         await listener.on_download_start()
-
-        if listener.batch_mode or listener.file_types:
-            if event is not None and not event.is_set():
-                while not event.is_set():
-                    if listener.is_cancelled:
-                        return
-                    await sleep(1)
-                async with task_dict_lock:
-                    if listener.mid in task_dict:
-                        task_dict[listener.mid].queued = False
-                await on_download_start(f"{listener.mid}")
-            if listener.is_cancelled:
-                return
-            if listener.multi <= 1 and not listener.is_rss:
-                await send_status_message(listener.message)
-            await prepare_qbit_selection(listener, ext_hash)
-            return
 
         if Config.BASE_URL and listener.select:
             if listener.link.startswith("magnet:"):

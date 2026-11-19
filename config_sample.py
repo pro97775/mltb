@@ -10,7 +10,7 @@ CMD_SUFFIX = ""
 AUTHORIZED_CHATS = ""
 SUDO_USERS = ""
 DATABASE_URL = ""
-DATABASE_NAME = "mltb"
+DATABASE_NAME = "cloudbot"
 STATUS_LIMIT = 4
 DEFAULT_UPLOAD = "rc"
 STATUS_UPDATE_INTERVAL = 15
@@ -86,13 +86,13 @@ THUMBNAIL_LAYOUT = ""
 FILES_LINKS = False
 # qBittorrent/Aria2c
 TORRENT_TIMEOUT = 0
-# Torrent batching: 0 files per batch disables batching.
-# When enabled, only N files are downloaded at a time, uploaded, then deleted
-# before the next files are marked for download.
+# Torrent batching (0 = disabled). Files per batch and/or bytes per batch
 FILES_PER_BATCH = 0
 BATCH_MAX_SIZE = 0
-# Only download these file types: video audio photo document apps (empty = all)
-TORRENT_FILE_TYPES = []
+# Only download these file types in batch mode (space/comma separated: video audio photo document apps); empty = all
+TORRENT_FILE_TYPES = ""
+# Skip files already uploaded for this torrent (tracked in MongoDB)
+SKIP_UPLOADED_FILES = True
 BASE_URL = ""
 BASE_URL_PORT = 0
 WEB_PINCODE = False
@@ -107,22 +107,4 @@ RSS_SIZE_LIMIT = 0
 # Torrent Search
 SEARCH_API_LINK = ""
 SEARCH_LIMIT = 0
-SEARCH_PLUGINS = [
-    "https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/piratebay.py",
-    "https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/limetorrents.py",
-    "https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/torlock.py",
-    "https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/torrentscsv.py",
-    "https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/eztv.py",
-    "https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/torrentproject.py",
-    "https://raw.githubusercontent.com/MaurizioRicci/qBittorrent_search_engines/master/kickass_torrent.py",
-    "https://raw.githubusercontent.com/MaurizioRicci/qBittorrent_search_engines/master/yts_am.py",
-    "https://raw.githubusercontent.com/MadeOfMagicAndWires/qBit-plugins/master/engines/linuxtracker.py",
-    "https://raw.githubusercontent.com/MadeOfMagicAndWires/qBit-plugins/master/engines/nyaasi.py",
-    "https://raw.githubusercontent.com/LightDestory/qBittorrent-Search-Plugins/master/src/engines/ettv.py",
-    "https://raw.githubusercontent.com/LightDestory/qBittorrent-Search-Plugins/master/src/engines/glotorrents.py",
-    "https://raw.githubusercontent.com/LightDestory/qBittorrent-Search-Plugins/master/src/engines/thepiratebay.py",
-    "https://raw.githubusercontent.com/v1k45/1337x-qBittorrent-search-plugin/master/leetx.py",
-    "https://raw.githubusercontent.com/nindogo/qbtSearchScripts/master/magnetdl.py",
-    "https://raw.githubusercontent.com/msagca/qbittorrent_plugins/main/uniondht.py",
-    "https://raw.githubusercontent.com/khensolomon/leyts/master/yts.py",
-]
+SEARCH_PLUGINS = []
