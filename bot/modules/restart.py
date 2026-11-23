@@ -146,7 +146,21 @@ async def _resume_tasks(notifier_dict):
                             LOGGER.warning(
                                 f"Resume: cannot fetch reply msg {reply_to_msg_id}: {e}"
                             )
-                    await handler(TgClient.bot, msg)
+                    new_link = msg.link or f"{msg.chat.id}:{msg.id}"
+                    await database.add_incomplete_task(
+                        cid,
+                        new_link,
+                        tag,
+                        command,
+                        user_id,
+                        reply_to_msg_id,
+                        thread_id,
+                    )
+                    try:
+                        await handler(TgClient.bot, msg)
+                    except Exception:
+                        await database.rm_complete_task(new_link)
+                        raise
                     key = task.get("key")
                     if key:
                         await database.rm_incomplete_task(key)
