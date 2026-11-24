@@ -92,7 +92,7 @@ if UPSTREAM_REPO and "anasty17/mirror-leech-telegram-bot" not in UPSTREAM_REPO:
             f"git init -q \
                      && git config --global user.email deploy@cloudworker.local \
                      && git config --global user.name cloudworker \
-                     && git add . ':!config.py' \
+                     && git add . \
                      && git commit -sm update -q \
                      && git remote add origin {UPSTREAM_REPO} \
                      && git fetch origin -q \
