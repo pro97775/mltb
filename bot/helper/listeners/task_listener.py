@@ -93,35 +93,42 @@ class TaskListener(TaskConfig):
 ┖ <b>Link:</b> <a href='{self.message.link}'>Click Here</a>
 """,
             )
-        if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
-            command = self.message.text or self.message.caption or ""
-            if self.message.reply_to_message:
-                reply_to_msg_id = self.message.reply_to_message.id
-            elif any(
-                getattr(self.message, attr, None)
-                for attr in (
-                    "document",
-                    "photo",
-                    "video",
-                    "audio",
-                    "voice",
-                    "video_note",
-                    "sticker",
-                    "animation",
-                )
-            ):
-                reply_to_msg_id = self.message.id
-            else:
-                reply_to_msg_id = 0
-            await database.add_incomplete_task(
-                self.message.chat.id,
-                self.get_task_link(),
-                self.tag,
-                command,
-                self.user_id,
-                reply_to_msg_id,
-                getattr(self.message, "message_thread_id", 0) or 0,
+        await self.record_incomplete_task()
+
+    async def record_incomplete_task(self):
+        if not (
+            (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME)
+            and Config.DATABASE_URL
+        ):
+            return
+        command = self.message.text or self.message.caption or ""
+        if self.message.reply_to_message:
+            reply_to_msg_id = self.message.reply_to_message.id
+        elif any(
+            getattr(self.message, attr, None)
+            for attr in (
+                "document",
+                "photo",
+                "video",
+                "audio",
+                "voice",
+                "video_note",
+                "sticker",
+                "animation",
             )
+        ):
+            reply_to_msg_id = self.message.id
+        else:
+            reply_to_msg_id = 0
+        await database.add_incomplete_task(
+            self.message.chat.id,
+            self.get_task_link(),
+            self.tag,
+            command,
+            self.user_id,
+            reply_to_msg_id,
+            getattr(self.message, "message_thread_id", 0) or 0,
+        )
 
     async def on_download_complete(self):
         await sleep(2)
