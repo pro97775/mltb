@@ -1,12 +1,9 @@
 from pyrogram import Client, enums
 from pyrogram.types import LinkPreviewOptions
-from asyncio import Lock, TimeoutError, sleep
+from asyncio import Lock
 
 from .. import LOGGER
 from .config_manager import Config
-
-START_ATTEMPTS = 3
-START_RETRY_DELAY = 5
 
 
 class TgClient:
@@ -36,27 +33,8 @@ class TgClient:
             sleep_threshold=0,
             link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
-        await cls._start_client(cls.bot, "Bot")
+        await cls.bot.start()
         cls.NAME = cls.bot.me.username
-
-    @classmethod
-    async def _start_client(cls, client, label):
-        for attempt in range(1, START_ATTEMPTS + 1):
-            try:
-                await client.start()
-                return
-            except (TimeoutError, OSError) as e:
-                if attempt == START_ATTEMPTS:
-                    raise
-                LOGGER.warning(
-                    f"{label} client failed to start (attempt {attempt}/{START_ATTEMPTS}): "
-                    f"{e}. Retrying in {START_RETRY_DELAY}s."
-                )
-                try:
-                    await client.disconnect()
-                except Exception:
-                    pass
-                await sleep(START_RETRY_DELAY)
 
     @classmethod
     async def start_user(cls):

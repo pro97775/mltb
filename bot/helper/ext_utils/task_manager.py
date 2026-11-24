@@ -96,10 +96,6 @@ async def check_running_tasks(listener, state="dl"):
             else:
                 non_queued_dl.add(listener.mid)
 
-    if is_over_limit and state == "dl":
-        if record := getattr(listener, "record_incomplete_task", None):
-            await record()
-
     return is_over_limit, event
 
 
