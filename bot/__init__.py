@@ -1,6 +1,13 @@
-from uvloop import install
+from os import getenv
 
-install()
+# Set DISABLE_UVLOOP=true (Heroku config var) to fall back to the stdlib event loop.
+if getenv("DISABLE_UVLOOP", "").strip().lower() not in ("1", "true", "yes"):
+    try:
+        from uvloop import install
+
+        install()
+    except ImportError:
+        pass
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from asyncio import Lock, new_event_loop, set_event_loop
 from logging import (
@@ -17,7 +24,9 @@ from os import cpu_count
 
 getLogger("requests").setLevel(WARNING)
 getLogger("urllib3").setLevel(WARNING)
-getLogger("pyrogram").setLevel(ERROR)
+# WARNING (not ERROR) so pyrogram's per-attempt 'Retrying "<query>" due to: <reason>'
+# lines are visible. Set PYROGRAM_LOG_LEVEL=DEBUG for full MTProto tracing.
+getLogger("pyrogram").setLevel(getenv("PYROGRAM_LOG_LEVEL", "WARNING").strip().upper())
 getLogger("httpx").setLevel(WARNING)
 getLogger("pymongo").setLevel(WARNING)
 getLogger("aiohttp").setLevel(WARNING)
